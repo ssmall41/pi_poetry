@@ -30,9 +30,13 @@ int main(int argc, char* argv[]) {
             std::string(""));
         int max_gap = config["phrase_scanner"]["max_gap"].value_or(5);
 
+        std::size_t min_word_length = config["word_finder"]["min_word_length"].value_or(
+            std::size_t{1});
+
         FileDigitSource source(digit_path);
         TwoDigitBlockMapper mapper;
         AhoCorasickCPU finder;
+        finder.set_min_word_length(min_word_length);
         finder.load_dictionary(dict_path);
         finder.build();
         HumanReviewScanner scanner(max_gap);

@@ -11,7 +11,7 @@ AhoCorasickCPU::AhoCorasickCPU() {
 }
 
 void AhoCorasickCPU::insert_word(const std::string& word) {
-    if (word.size() < 3) return;
+    if (word.size() < min_word_length_) return;
     int cur = 0;
     for (char c : word) {
         if (c < 'a' || c > 'z') return;  // skip non-lowercase words
@@ -71,6 +71,10 @@ void AhoCorasickCPU::load_dictionary(const std::string& path) {
 
 void AhoCorasickCPU::set_overlap_policy(OverlapPolicy policy) {
     policy_ = policy;
+}
+
+void AhoCorasickCPU::set_min_word_length(std::size_t min_len) {
+    min_word_length_ = min_len;
 }
 
 std::vector<WordMatch> AhoCorasickCPU::scan(const char* char_buffer,
