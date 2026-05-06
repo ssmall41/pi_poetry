@@ -18,8 +18,8 @@ class PhraseScanner {
 public:
     virtual ~PhraseScanner() = default;
 
-    // Analyzes a word stream and returns phrases of length >= 2,
-    // sorted by start_offset ascending.
+    // Analyzes a word stream and returns all matches (including isolated
+    // single words), sorted by start_offset ascending.
     virtual std::vector<PhraseMatch> process_words(
         const std::vector<WordMatch>& word_stream) = 0;
 
