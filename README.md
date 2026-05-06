@@ -31,6 +31,57 @@ ctest --test-dir build --output-on-failure
 
 Open the folder in VSCode. Use **Ctrl+Shift+B** to build, the Testing panel (flask icon) to run tests, and **F5** to debug.
 
+## Configuration
+
+The configuration file is a [TOML](https://toml.io/) document passed via `--config`. See `config/default.toml` for a complete example.
+
+### `[pipeline]`
+
+| Field | Default | Valid Values | Description |
+|-------|---------|--------------|-------------|
+| `mode` * | `"serial"` | `"serial"` | Controls how pipeline stages are scheduled. |
+
+### `[digit_source]`
+
+| Field | Default | Valid Values | Description |
+|-------|---------|--------------|-------------|
+| `type` * | `"file"` | `"file"` | Digit source implementation to use. |
+| `path` | `"data/pi_2000.txt"` | Any file path | Plain-text file of pi digits, one ASCII digit per byte. |
+| `threads` * | `1` | Positive integer | Worker threads for the digit source. |
+
+### `[digit_mapper]`
+
+| Field | Default | Valid Values | Description |
+|-------|---------|--------------|-------------|
+| `type` * | `"two-digit-block"` | `"two-digit-block"` | Mapper implementation to use. |
+| `alphabet` * | `"alpha-lower"` | `"alpha-lower"` | Character set to map digit pairs into. |
+| `base` * | `10` | `10` | Numeric base of the digit stream. |
+| `threads` * | `1` | Positive integer | Worker threads for the mapper. |
+| `output_letters` | `""` | Any file path, or `""` | If non-empty, writes the full mapped character stream to this file for inspection. |
+
+### `[word_finder]`
+
+| Field | Default | Valid Values | Description |
+|-------|---------|--------------|-------------|
+| `type` * | `"aho-corasick-cpu"` | `"aho-corasick-cpu"` | Word-finder implementation to use. |
+| `dictionary` | `"dictionaries/english.txt"` | Any file path | Path to the word list, one word per line. |
+| `overlap_policy` * | `"earliest-then-longest"` | `"earliest-then-longest"` | How to resolve overlapping word matches. `"earliest-then-longest"` picks the match starting soonest; ties broken by longest word. |
+| `min_word_length` | `3` | Positive integer | Words shorter than this are ignored. |
+| `threads` * | `1` | Positive integer | Worker threads for the word finder. |
+
+### `[phrase_scanner]`
+
+| Field | Default | Valid Values | Description |
+|-------|---------|--------------|-------------|
+| `type` * | `"human-review"` | `"human-review"` | Phrase-scanner implementation to use. |
+| `mode` * | `"gap-tolerant"` | `"gap-tolerant"` | How gaps between consecutive words are treated. |
+| `max_gap` | `5` | Non-negative integer | Maximum number of unmapped characters allowed between two consecutive words for them to be grouped into the same phrase. |
+| `threads` * | `1` | Positive integer | Worker threads for the phrase scanner. |
+| `output_text` | `"results.txt"` | Any file path | Path for the human-readable results file. |
+| `output_json` | `"results.json"` | Any file path | Path for the machine-readable JSON results file. |
+
+\* Reserved — parsed but not yet used.
+
 ## Dictionary
 
 `dictionaries/english.txt` is derived from the [SCOWL](http://wordlist.aspell.net/) (Spelling Checker Oriented Word Lists) large American English word list, distributed via the `wamerican-large` Debian package. SCOWL is made available under a permissive open-source licence — see [SCOWL copyright](http://wordlist.aspell.net/scowl-readme/) for details. Only lowercase words are retained.
