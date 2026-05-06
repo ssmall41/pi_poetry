@@ -1,0 +1,28 @@
+[pipeline]
+mode = "serial"
+
+[digit_source]
+type = "file"
+path = "data/pi_2000.txt"
+threads = 1
+
+[digit_mapper]
+type = "two-digit-block"
+alphabet = "alpha-lower"
+base = 10
+threads = 1
+
+[word_finder]
+type = "aho-corasick-cpu"
+dictionary = "dictionaries/english.txt"
+overlap_policy = "earliest-then-longest"
+min_word_length = 3
+threads = 1
+
+[phrase_scanner]
+type = "human-review"
+mode = "gap-tolerant"
+max_gap = 5
+threads = 1
+output_text = "results.txt"
+output_json = "results.json"

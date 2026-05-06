@@ -67,3 +67,17 @@ vcpkg_installed/
 # test output & cache
 Testing/
 .cache/
+
+# Pi Poetry data files (user-supplied)
+data/*.txt
+data/*.bin
+
+# Pi Poetry output
+results.txt
+results.json
+
+# Extracted deb packages
+*.deb
+
+# Visual Studio Code settings
+.vscode
