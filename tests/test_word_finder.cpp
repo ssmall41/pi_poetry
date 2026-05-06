@@ -58,12 +58,37 @@ TEST(AhoCorasickCPU, EarliestThenLongest) {
 
 TEST(AhoCorasickCPU, MinWordLengthFiltersShortWords) {
     AhoCorasickCPU ac;
+    ac.set_min_word_length(3);
     ac.insert_word("ab");   // too short, silently dropped
     ac.insert_word("abc");
     ac.build();
     auto r = do_scan(ac, "xabc");
     ASSERT_EQ(r.size(), 1u);
     EXPECT_EQ(r[0].word, "abc");
+    EXPECT_EQ(r[0].start, 1u);
+}
+
+TEST(AhoCorasickCPU, MinWordLength1AcceptsSingleLetterWords) {
+    AhoCorasickCPU ac;
+    ac.set_min_word_length(1);
+    ac.insert_word("a");
+    ac.insert_word("cat");
+    ac.build();
+    auto r = do_scan(ac, "xa");
+    ASSERT_EQ(r.size(), 1u);
+    EXPECT_EQ(r[0].word, "a");
+    EXPECT_EQ(r[0].start, 1u);
+}
+
+TEST(AhoCorasickCPU, MinWordLength4RejectsThreeLetterWords) {
+    AhoCorasickCPU ac;
+    ac.set_min_word_length(4);
+    ac.insert_word("cat");   // 3 letters, dropped
+    ac.insert_word("cats");  // 4 letters, accepted
+    ac.build();
+    auto r = do_scan(ac, "xcats");
+    ASSERT_EQ(r.size(), 1u);
+    EXPECT_EQ(r[0].word, "cats");
     EXPECT_EQ(r[0].start, 1u);
 }
 
@@ -103,6 +128,7 @@ TEST(AhoCorasickCPU, LoadDictionaryFile) {
     if (!std::filesystem::exists(DICT_PATH))
         GTEST_SKIP() << "dictionaries/english.txt absent";
     AhoCorasickCPU ac;
+    ac.set_min_word_length(3);
     ac.load_dictionary(DICT_PATH);
     ac.build();
     auto r = do_scan(ac, "qbswordslp");
