@@ -13,8 +13,6 @@ void HumanReviewScanner::set_gap_policy(GapPolicy policy) {
 std::vector<PhraseMatch> HumanReviewScanner::process_words(
     const std::vector<WordMatch>& word_stream) {
 
-    if (word_stream.size() < 2) return {};
-
     // Work on a sorted copy
     std::vector<const WordMatch*> sorted;
     sorted.reserve(word_stream.size());
@@ -45,8 +43,7 @@ std::vector<PhraseMatch> HumanReviewScanner::process_words(
             ++j;
         }
 
-        if (phrase.words.size() >= 2)
-            result.push_back(std::move(phrase));
+        result.push_back(std::move(phrase));
 
         i = j > i + 1 ? j : i + 1;  // skip merged words
     }
