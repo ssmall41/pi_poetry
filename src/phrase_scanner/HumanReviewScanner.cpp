@@ -83,16 +83,17 @@ void HumanReviewScanner::write_json(const std::vector<PhraseMatch>& phrases,
 }
 
 void HumanReviewScanner::write_results(const std::vector<PhraseMatch>& phrases,
-                                       const std::string& text_path,
-                                       const std::string& json_path) const {
+                                       const std::filesystem::path& run_dir) const {
     {
-        std::ofstream f(text_path);
-        if (!f) throw std::runtime_error("Cannot open output file: " + text_path);
+        auto p = run_dir / "results.txt";
+        std::ofstream f(p);
+        if (!f) throw std::runtime_error("Cannot open output file: " + p.string());
         write_text(phrases, f);
     }
     {
-        std::ofstream f(json_path);
-        if (!f) throw std::runtime_error("Cannot open output file: " + json_path);
+        auto p = run_dir / "results.json";
+        std::ofstream f(p);
+        if (!f) throw std::runtime_error("Cannot open output file: " + p.string());
         write_json(phrases, f);
     }
 }

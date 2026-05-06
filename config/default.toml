@@ -1,3 +1,6 @@
+[output]
+dir = "outputs"
+
 [pipeline]
 mode = "serial"
 
@@ -11,7 +14,6 @@ type = "two-digit-block"
 alphabet = "alpha-lower"
 base = 10
 threads = 1
-output_letters = "debug_letters.txt"
 
 [word_finder]
 type = "aho-corasick-cpu"
@@ -25,5 +27,3 @@ type = "human-review"
 mode = "gap-tolerant"
 max_gap = 5
 threads = 1
-output_text = "results.txt"
-output_json = "results.json"

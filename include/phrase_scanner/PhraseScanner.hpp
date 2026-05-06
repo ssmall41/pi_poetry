@@ -1,5 +1,6 @@
 #pragma once
 #include "word_finder/WordFinder.hpp"
+#include <filesystem>
 #include <string>
 #include <vector>
 
@@ -25,9 +26,6 @@ public:
 
     virtual void set_gap_policy(GapPolicy policy) = 0;
 
-    // Writes results to plain-text and JSON files.
-    // On the interface to avoid Pipeline downcasting.
     virtual void write_results(const std::vector<PhraseMatch>& phrases,
-                               const std::string& text_path,
-                               const std::string& json_path) const = 0;
+                               const std::filesystem::path& run_dir) const = 0;
 };
