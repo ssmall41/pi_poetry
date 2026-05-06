@@ -11,6 +11,7 @@ type = "two-digit-block"
 alphabet = "alpha-lower"
 base = 10
 threads = 1
+output_letters = "debug_letters.txt"
 
 [word_finder]
 type = "aho-corasick-cpu"

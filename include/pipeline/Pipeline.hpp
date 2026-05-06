@@ -13,7 +13,8 @@ public:
     // Validates base() == required_base(), then runs all 4 stages serially.
     // Throws std::runtime_error on base mismatch or I/O failure.
     void run(const std::string& output_text_path,
-             const std::string& output_json_path);
+             const std::string& output_json_path,
+             const std::string& output_letters_path = "");
 
 private:
     DigitSource&   source_;

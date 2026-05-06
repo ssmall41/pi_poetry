@@ -64,9 +64,11 @@ add_executable(pi_poetry_tests
     tests/test_digit_mapper.cpp
     tests/test_word_finder.cpp
     tests/test_phrase_scanner.cpp
+    tests/test_pipeline.cpp
 )
 target_link_libraries(pi_poetry_tests PRIVATE
     digit_source_lib digit_mapper_lib word_finder_lib phrase_scanner_lib
+    pipeline_lib
     GTest::gtest_main
 )
 target_compile_definitions(pi_poetry_tests PRIVATE
