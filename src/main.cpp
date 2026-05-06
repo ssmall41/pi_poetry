@@ -26,6 +26,8 @@ int main(int argc, char* argv[]) {
             std::string("results.txt"));
         std::string out_json = config["phrase_scanner"]["output_json"].value_or(
             std::string("results.json"));
+        std::string out_letters = config["digit_mapper"]["output_letters"].value_or(
+            std::string(""));
         int max_gap = config["phrase_scanner"]["max_gap"].value_or(5);
 
         FileDigitSource source(digit_path);
@@ -36,7 +38,7 @@ int main(int argc, char* argv[]) {
         HumanReviewScanner scanner(max_gap);
 
         Pipeline pipeline(source, mapper, finder, scanner);
-        pipeline.run(out_text, out_json);
+        pipeline.run(out_text, out_json, out_letters);
 
         std::cout << "Pi Poetry complete. Results: " << out_text
                   << ", " << out_json << "\n";

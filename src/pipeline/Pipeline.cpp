@@ -1,4 +1,5 @@
 #include "pipeline/Pipeline.hpp"
+#include <fstream>
 #include <stdexcept>
 #include <vector>
 
@@ -7,7 +8,8 @@ Pipeline::Pipeline(DigitSource& source, DigitMapper& mapper,
     : source_(source), mapper_(mapper), finder_(finder), scanner_(scanner) {}
 
 void Pipeline::run(const std::string& output_text_path,
-                   const std::string& output_json_path) {
+                   const std::string& output_json_path,
+                   const std::string& output_letters_path) {
     if (source_.base() != mapper_.required_base())
         throw std::runtime_error("Base mismatch: digit source produces base " +
                                  std::to_string(source_.base()) +
@@ -32,6 +34,14 @@ void Pipeline::run(const std::string& output_text_path,
     std::size_t out_n = 0;
     mapper_.map(all_digits.data(), usable, chars.data(), out_n);
     chars.resize(out_n);
+
+    if (!output_letters_path.empty()) {
+        std::ofstream ofs(output_letters_path);
+        if (!ofs)
+            throw std::runtime_error("Cannot open output file: " + output_letters_path);
+        ofs.write(chars.data(), static_cast<std::streamsize>(chars.size()));
+        ofs.put('\n');
+    }
 
     // Stage 3: find words
     auto word_matches = finder_.scan(chars.data(), chars.size(), 0);

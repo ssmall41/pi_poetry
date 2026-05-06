@@ -75,6 +75,7 @@ data/*.bin
 # Pi Poetry output
 results.txt
 results.json
+debug_letters.txt
 
 # Extracted deb packages
 *.deb
