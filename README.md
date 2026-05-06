@@ -19,7 +19,7 @@ Supply a plain-text file of pi digits (one ASCII digit per byte) at `data/pi_dig
 ./build/pi_poetry --config config/default.toml
 ```
 
-Results are written to `results.txt` and `results.json` (configurable in `config/default.toml`).
+Each run creates a timestamped subfolder (e.g. `outputs/run-20260506_143022/`) containing `results.txt`, `results.json`, and `debug_letters.txt`. The output directory is configurable in `config/default.toml`.
 
 ## Running Tests
 
@@ -34,6 +34,12 @@ Open the folder in VSCode. Use **Ctrl+Shift+B** to build, the Testing panel (fla
 ## Configuration
 
 The configuration file is a [TOML](https://toml.io/) document passed via `--config`. See `config/default.toml` for a complete example.
+
+### `[output]`
+
+| Field | Default | Valid Values | Description |
+|-------|---------|--------------|-------------|
+| `dir` | `"outputs"` | Any directory path | Base directory for run output. Each run creates a `run-YYYYMMDD_HHMMSS` subfolder here containing all output files. |
 
 ### `[pipeline]`
 
@@ -57,7 +63,6 @@ The configuration file is a [TOML](https://toml.io/) document passed via `--conf
 | `alphabet` * | `"alpha-lower"` | `"alpha-lower"` | Character set to map digit pairs into. |
 | `base` * | `10` | `10` | Numeric base of the digit stream. |
 | `threads` * | `1` | Positive integer | Worker threads for the mapper. |
-| `output_letters` | `""` | Any file path, or `""` | If non-empty, writes the full mapped character stream to this file for inspection. |
 
 ### `[word_finder]`
 
@@ -77,8 +82,6 @@ The configuration file is a [TOML](https://toml.io/) document passed via `--conf
 | `mode` * | `"gap-tolerant"` | `"gap-tolerant"` | How gaps between consecutive words are treated. |
 | `max_gap` | `5` | Non-negative integer | Maximum number of unmapped characters allowed between two consecutive words for them to be grouped into the same phrase. |
 | `threads` * | `1` | Positive integer | Worker threads for the phrase scanner. |
-| `output_text` | `"results.txt"` | Any file path | Path for the human-readable results file. |
-| `output_json` | `"results.json"` | Any file path | Path for the machine-readable JSON results file. |
 
 \* Reserved — parsed but not yet used.
 

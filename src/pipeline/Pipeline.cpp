@@ -2,14 +2,13 @@
 #include <fstream>
 #include <stdexcept>
 #include <vector>
+#include <filesystem>
 
 Pipeline::Pipeline(DigitSource& source, DigitMapper& mapper,
                    WordFinder& finder, PhraseScanner& scanner)
     : source_(source), mapper_(mapper), finder_(finder), scanner_(scanner) {}
 
-void Pipeline::run(const std::string& output_text_path,
-                   const std::string& output_json_path,
-                   const std::string& output_letters_path) {
+void Pipeline::run(const std::filesystem::path& run_dir) {
     if (source_.base() != mapper_.required_base())
         throw std::runtime_error("Base mismatch: digit source produces base " +
                                  std::to_string(source_.base()) +
@@ -35,10 +34,11 @@ void Pipeline::run(const std::string& output_text_path,
     mapper_.map(all_digits.data(), usable, chars.data(), out_n);
     chars.resize(out_n);
 
-    if (!output_letters_path.empty()) {
-        std::ofstream ofs(output_letters_path);
+    {
+        auto letters_path = run_dir / "debug_letters.txt";
+        std::ofstream ofs(letters_path);
         if (!ofs)
-            throw std::runtime_error("Cannot open output file: " + output_letters_path);
+            throw std::runtime_error("Cannot open output file: " + letters_path.string());
         ofs.write(chars.data(), static_cast<std::streamsize>(chars.size()));
         ofs.put('\n');
     }
@@ -48,5 +48,5 @@ void Pipeline::run(const std::string& output_text_path,
 
     // Stage 4: find phrases and write output
     auto phrase_matches = scanner_.process_words(word_matches);
-    scanner_.write_results(phrase_matches, output_text_path, output_json_path);
+    scanner_.write_results(phrase_matches, run_dir);
 }

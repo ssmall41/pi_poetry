@@ -12,8 +12,7 @@ public:
     void set_gap_policy(GapPolicy policy) override;
 
     void write_results(const std::vector<PhraseMatch>& phrases,
-                       const std::string& text_path,
-                       const std::string& json_path) const override;
+                       const std::filesystem::path& run_dir) const override;
 
     // Stream writers (used directly in tests)
     void write_text(const std::vector<PhraseMatch>& phrases, std::ostream& out) const;

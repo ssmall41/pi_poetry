@@ -3,6 +3,7 @@
 #include "digit_mapper/DigitMapper.hpp"
 #include "word_finder/WordFinder.hpp"
 #include "phrase_scanner/PhraseScanner.hpp"
+#include <filesystem>
 #include <string>
 
 class Pipeline {
@@ -12,9 +13,7 @@ public:
 
     // Validates base() == required_base(), then runs all 4 stages serially.
     // Throws std::runtime_error on base mismatch or I/O failure.
-    void run(const std::string& output_text_path,
-             const std::string& output_json_path,
-             const std::string& output_letters_path = "");
+    void run(const std::filesystem::path& run_dir);
 
 private:
     DigitSource&   source_;
