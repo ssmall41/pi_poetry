@@ -19,7 +19,7 @@ Supply a plain-text file of pi digits (one ASCII digit per byte) at `data/pi_dig
 ./build/pi_poetry --config config/default.toml
 ```
 
-Each run creates a timestamped subfolder (e.g. `outputs/run-20260506_143022/`) containing `results.txt`, `results.json`, and `debug_letters.txt`. The output directory is configurable in `config/default.toml`.
+Each run creates a timestamped subfolder (e.g. `outputs/run-20260506_143022/`) containing `results.txt` and `results.json`. If `write_letter_sequence = true` in the `[digit_mapper]` config, `letter_sequence.txt` is also written. The output directory is configurable in `config/default.toml`.
 
 ## Running Tests
 
@@ -63,6 +63,7 @@ The configuration file is a [TOML](https://toml.io/) document passed via `--conf
 | `alphabet` * | `"alpha-lower"` | `"alpha-lower"` | Character set to map digit pairs into. |
 | `base` * | `10` | `10` | Numeric base of the digit stream. |
 | `threads` * | `1` | Positive integer | Worker threads for the mapper. |
+| `write_letter_sequence` | `false` | `true`, `false` | When true, writes the mapped letter sequence to `letter_sequence.txt` in the run directory. |
 
 ### `[word_finder]`
 

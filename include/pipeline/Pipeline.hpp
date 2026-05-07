@@ -13,7 +13,7 @@ public:
 
     // Validates base() == required_base(), then runs all 4 stages serially.
     // Throws std::runtime_error on base mismatch or I/O failure.
-    void run(const std::filesystem::path& run_dir);
+    void run(const std::filesystem::path& run_dir, bool write_letter_sequence = false);
 
 private:
     DigitSource&   source_;

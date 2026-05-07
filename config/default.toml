@@ -14,6 +14,7 @@ type = "two-digit-block"
 alphabet = "alpha-lower"
 base = 10
 threads = 1
+write_letter_sequence = true
 
 [word_finder]
 type = "aho-corasick-cpu"
