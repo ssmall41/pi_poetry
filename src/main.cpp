@@ -29,6 +29,7 @@ int main(int argc, char* argv[]) {
         std::size_t min_word_length = config["word_finder"]["min_word_length"].value_or(
             std::size_t{1});
         std::string out_dir = config["output"]["dir"].value_or(std::string("outputs"));
+        bool write_letter_sequence = config["digit_mapper"]["write_letter_sequence"].value_or(false);
 
         auto now = std::chrono::system_clock::now();
         std::time_t t = std::chrono::system_clock::to_time_t(now);
@@ -50,7 +51,7 @@ int main(int argc, char* argv[]) {
         HumanReviewScanner scanner(max_gap);
 
         Pipeline pipeline(source, mapper, finder, scanner);
-        pipeline.run(run_dir);
+        pipeline.run(run_dir, write_letter_sequence);
     } catch (const std::exception& ex) {
         std::cerr << "Error: " << ex.what() << "\n";
         return 1;

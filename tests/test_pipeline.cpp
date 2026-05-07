@@ -47,15 +47,22 @@ TEST(Pipeline_RunDir, WritesTextFileInRunDir) {
     EXPECT_TRUE(std::filesystem::exists(fix.run_dir / "results.txt"));
 }
 
-// --- All three output files appear ---
+// --- Letter file: written when enabled, skipped when disabled ---
 
-TEST(Pipeline_RunDir, WritesAllThreeOutputFilesInRunDir) {
+TEST(Pipeline_RunDir, WritesLetterFileWhenEnabled) {
+    PipelineFixture fix;
+    auto pipeline = fix.make();
+    pipeline.run(fix.run_dir, true);
+    EXPECT_TRUE(std::filesystem::exists(fix.run_dir / "results.txt"));
+    EXPECT_TRUE(std::filesystem::exists(fix.run_dir / "results.json"));
+    EXPECT_TRUE(std::filesystem::exists(fix.run_dir / "letter_sequence.txt"));
+}
+
+TEST(Pipeline_RunDir, SkipsLetterFileWhenDisabled) {
     PipelineFixture fix;
     auto pipeline = fix.make();
     pipeline.run(fix.run_dir);
-    EXPECT_TRUE(std::filesystem::exists(fix.run_dir / "results.txt"));
-    EXPECT_TRUE(std::filesystem::exists(fix.run_dir / "results.json"));
-    EXPECT_TRUE(std::filesystem::exists(fix.run_dir / "debug_letters.txt"));
+    EXPECT_FALSE(std::filesystem::exists(fix.run_dir / "letter_sequence.txt"));
 }
 
 // --- Letters file content is correct ---
@@ -63,9 +70,9 @@ TEST(Pipeline_RunDir, WritesAllThreeOutputFilesInRunDir) {
 TEST(Pipeline_RunDir, LettersFileContainsExpectedContent) {
     PipelineFixture fix;
     auto pipeline = fix.make();
-    pipeline.run(fix.run_dir);
+    pipeline.run(fix.run_dir, true);
 
-    std::ifstream f(fix.run_dir / "debug_letters.txt");
+    std::ifstream f(fix.run_dir / "letter_sequence.txt");
     ASSERT_TRUE(f.is_open());
     std::string contents((std::istreambuf_iterator<char>(f)),
                           std::istreambuf_iterator<char>());

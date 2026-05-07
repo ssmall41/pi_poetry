@@ -8,7 +8,7 @@ Pipeline::Pipeline(DigitSource& source, DigitMapper& mapper,
                    WordFinder& finder, PhraseScanner& scanner)
     : source_(source), mapper_(mapper), finder_(finder), scanner_(scanner) {}
 
-void Pipeline::run(const std::filesystem::path& run_dir) {
+void Pipeline::run(const std::filesystem::path& run_dir, bool write_letter_sequence) {
     if (source_.base() != mapper_.required_base())
         throw std::runtime_error("Base mismatch: digit source produces base " +
                                  std::to_string(source_.base()) +
@@ -34,8 +34,8 @@ void Pipeline::run(const std::filesystem::path& run_dir) {
     mapper_.map(all_digits.data(), usable, chars.data(), out_n);
     chars.resize(out_n);
 
-    {
-        auto letters_path = run_dir / "debug_letters.txt";
+    if (write_letter_sequence) {
+        auto letters_path = run_dir / "letter_sequence.txt";
         std::ofstream ofs(letters_path);
         if (!ofs)
             throw std::runtime_error("Cannot open output file: " + letters_path.string());

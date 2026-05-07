@@ -71,6 +71,7 @@ Testing/
 # Pi Poetry data files (user-supplied)
 data/*.txt
 data/*.bin
+outputs/
 
 # Pi Poetry output
 results.txt
