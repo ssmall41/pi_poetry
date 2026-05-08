@@ -7,6 +7,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # ── Dependencies ─────────────────────────────────────────────────────────────
+find_package(OpenSSL REQUIRED)
 include(FetchContent)
 
 FetchContent_Declare(
@@ -21,8 +22,12 @@ FetchContent_Declare(
     googletest
     URL https://github.com/google/googletest/archive/refs/tags/v1.14.0.tar.gz
 )
+FetchContent_Declare(
+    cpp-httplib
+    URL https://github.com/yhirose/cpp-httplib/archive/refs/tags/v0.43.3.tar.gz
+)
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
-FetchContent_MakeAvailable(nlohmann_json tomlplusplus googletest)
+FetchContent_MakeAvailable(nlohmann_json tomlplusplus googletest cpp-httplib)
 
 # ── Stage libraries ───────────────────────────────────────────────────────────
 add_library(digit_source_lib STATIC src/digit_source/FileDigitSource.cpp)
@@ -54,6 +59,17 @@ target_link_libraries(pi_poetry PRIVATE pipeline_lib tomlplusplus::tomlplusplus)
 target_compile_definitions(pi_poetry PRIVATE
     PI_POETRY_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
 target_compile_options(pi_poetry PRIVATE -Wall -Wextra -Wpedantic)
+
+# ── Download utility ──────────────────────────────────────────────────────────
+add_executable(pi_download src/download_pi.cpp)
+target_compile_definitions(pi_download PRIVATE CPPHTTPLIB_OPENSSL_SUPPORT)
+target_link_libraries(pi_download PRIVATE
+    httplib::httplib
+    nlohmann_json::nlohmann_json
+    OpenSSL::SSL
+    OpenSSL::Crypto
+)
+target_compile_options(pi_download PRIVATE -Wall -Wextra -Wpedantic)
 
 # ── Tests ─────────────────────────────────────────────────────────────────────
 enable_testing()

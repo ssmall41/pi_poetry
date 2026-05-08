@@ -103,6 +103,44 @@ src/             Implementation source files
 tests/           Google Test unit and integration tests
 ```
 
+## Utility Programs
+
+### pi_download
+
+Downloads digits of pi from the [pi.delivery](https://pi.delivery) API and writes them to a plain-text file in the `data/` directory, ready for use with the main pipeline.
+
+**Compile:**
+
+```bash
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --parallel --target pi_download
+```
+
+**Usage:**
+
+```
+./build/pi_download <num_digits> [--output <path>]
+```
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `num_digits` | Yes | Total number of pi digits to download. |
+| `--output <path>` | No | Path to write the output file. Defaults to `data/pi_<num_digits>.txt`. |
+
+Digits are fetched in chunks of 1,000 (the API maximum per request) and progress is printed to stdout. If any request fails the program exits with an error and no file is written. The output is raw decimal digits with no punctuation (e.g. `31415926...`), one digit per byte, with a trailing newline — the format expected by the main pipeline.
+
+**Examples:**
+
+```bash
+# Download 10,000 digits → data/pi_10000.txt
+./build/pi_download 10000
+
+# Download 500 digits to a custom path
+./build/pi_download 500 --output data/small.txt
+```
+
+In VSCode, use **Terminal > Run Task > Run: pi_download** — it will prompt for the digit count before running.
+
 ## Technical Design
 
 See [pi_poetry_tdd_v3.md](pi_poetry_tdd_v3.md) for the full technical design document.
