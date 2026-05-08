@@ -1,5 +1,6 @@
 #include <httplib.h>
 #include <nlohmann/json.hpp>
+#include "download_pi_utils.h"
 #include <algorithm>
 #include <cstring>
 #include <fstream>
@@ -11,10 +12,12 @@ static constexpr int kChunkSize = 1000;
 struct Args {
     int num_digits;
     std::string output_path;
+    std::string input_path;
 };
 
 static void print_usage(const char* prog) {
-    std::cerr << "Usage: " << prog << " <num_digits> [--output <path>]\n";
+    std::cerr << "Usage: " << prog
+              << " <num_digits> [--input <path>] [--output <path>]\n";
 }
 
 static Args parse_args(int argc, char* argv[]) {
@@ -38,6 +41,8 @@ static Args parse_args(int argc, char* argv[]) {
     for (int i = 2; i < argc; ++i) {
         if (std::strcmp(argv[i], "--output") == 0 && i + 1 < argc) {
             args.output_path = argv[++i];
+        } else if (std::strcmp(argv[i], "--input") == 0 && i + 1 < argc) {
+            args.input_path = argv[++i];
         } else {
             std::cerr << "Unknown argument: " << argv[i] << "\n";
             print_usage(argv[0]);
@@ -52,8 +57,8 @@ static Args parse_args(int argc, char* argv[]) {
     return args;
 }
 
-// Returns accumulated digit string, or empty string on error.
-static std::string download_pi(int num_digits) {
+// Returns accumulated digit string starting at start_offset, or empty on error.
+static std::string download_pi(int num_digits, int start_offset) {
     httplib::SSLClient client("api.pi.delivery");
     client.set_connection_timeout(30);
     client.set_read_timeout(30);
@@ -64,17 +69,18 @@ static std::string download_pi(int num_digits) {
     int downloaded = 0;
     while (downloaded < num_digits) {
         int chunk = std::min(kChunkSize, num_digits - downloaded);
-        std::string path = "/v1/pi?start=" + std::to_string(downloaded) +
+        std::string path = "/v1/pi?start=" + std::to_string(start_offset + downloaded) +
                            "&numberOfDigits=" + std::to_string(chunk);
 
         auto res = client.Get(path);
         if (!res) {
-            std::cerr << "Error: HTTP request failed at start=" << downloaded << "\n";
+            std::cerr << "Error: HTTP request failed at start="
+                      << (start_offset + downloaded) << "\n";
             return {};
         }
         if (res->status != 200) {
             std::cerr << "Error: HTTP status " << res->status
-                      << " at start=" << downloaded << "\n";
+                      << " at start=" << (start_offset + downloaded) << "\n";
             return {};
         }
 
@@ -93,7 +99,8 @@ static std::string download_pi(int num_digits) {
 
         digits += j["content"].get<std::string>();
         downloaded += chunk;
-        std::cout << "Downloaded " << downloaded << "/" << num_digits << " digits\n";
+        std::cout << "Downloaded " << (start_offset + downloaded) << "/"
+                  << (start_offset + num_digits) << " digits\n";
     }
 
     return digits;
@@ -102,9 +109,35 @@ static std::string download_pi(int num_digits) {
 int main(int argc, char* argv[]) {
     auto args = parse_args(argc, argv);
 
-    std::string digits = download_pi(args.num_digits);
-    if (digits.empty()) {
-        return 1;
+    std::string output;
+
+    if (!args.input_path.empty()) {
+        auto existing = read_and_validate_input_file(args.input_path);
+        if (!existing.has_value()) {
+            std::cerr << "Error: failed to read or validate input file: "
+                      << args.input_path << "\n";
+            return 1;
+        }
+
+        int existing_count = static_cast<int>(existing->size());
+        if (existing_count >= args.num_digits) {
+            std::cerr << "Error: input file already contains " << existing_count
+                      << " digits, which meets/exceeds requested total of "
+                      << args.num_digits << ".\n";
+            return 1;
+        }
+
+        int additional = args.num_digits - existing_count;
+        std::string new_digits = download_pi(additional, existing_count);
+        if (new_digits.empty()) {
+            return 1;
+        }
+        output = std::move(*existing) + new_digits;
+    } else {
+        output = download_pi(args.num_digits, 0);
+        if (output.empty()) {
+            return 1;
+        }
     }
 
     std::ofstream out(args.output_path);
@@ -112,12 +145,12 @@ int main(int argc, char* argv[]) {
         std::cerr << "Error: failed to open output file: " << args.output_path << "\n";
         return 1;
     }
-    out << digits << "\n";
+    out << output << "\n";
     if (!out) {
         std::cerr << "Error: failed to write output file: " << args.output_path << "\n";
         return 1;
     }
 
-    std::cout << "Wrote " << digits.size() << " digits to " << args.output_path << "\n";
+    std::cout << "Wrote " << output.size() << " digits to " << args.output_path << "\n";
     return 0;
 }
