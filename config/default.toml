@@ -6,7 +6,7 @@ mode = "serial"
 
 [digit_source]
 type = "file"
-path = "data/pi_2000.txt"
+path = "data/pi_1000000.txt"
 threads = 1
 
 [digit_mapper]

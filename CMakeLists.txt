@@ -53,6 +53,11 @@ target_link_libraries(pipeline_lib PUBLIC
     digit_source_lib digit_mapper_lib word_finder_lib phrase_scanner_lib)
 target_compile_options(pipeline_lib PRIVATE -Wall -Wextra -Wpedantic)
 
+add_library(result_analyzer_lib STATIC src/result_analyzer/ResultAnalyzer.cpp)
+target_include_directories(result_analyzer_lib PUBLIC ${CMAKE_SOURCE_DIR}/include)
+target_link_libraries(result_analyzer_lib PUBLIC nlohmann_json::nlohmann_json)
+target_compile_options(result_analyzer_lib PRIVATE -Wall -Wextra -Wpedantic)
+
 add_library(config_validator_lib STATIC src/config_validator.cpp)
 target_include_directories(config_validator_lib PUBLIC ${CMAKE_SOURCE_DIR}/include)
 target_link_libraries(config_validator_lib PUBLIC tomlplusplus::tomlplusplus)
@@ -76,6 +81,11 @@ target_link_libraries(pi_download PRIVATE
 )
 target_compile_options(pi_download PRIVATE -Wall -Wextra -Wpedantic)
 
+# ── Analyze results utility ───────────────────────────────────────────────────
+add_executable(analyze_results src/analyze_results.cpp)
+target_link_libraries(analyze_results PRIVATE result_analyzer_lib)
+target_compile_options(analyze_results PRIVATE -Wall -Wextra -Wpedantic)
+
 # ── Tests ─────────────────────────────────────────────────────────────────────
 enable_testing()
 include(GoogleTest)
@@ -88,11 +98,13 @@ add_executable(pi_poetry_tests
     tests/test_pipeline.cpp
     tests/test_integration.cpp
     tests/test_config_validator.cpp
+    tests/test_analyze_results.cpp
 )
 target_link_libraries(pi_poetry_tests PRIVATE
     digit_source_lib digit_mapper_lib word_finder_lib phrase_scanner_lib
     pipeline_lib
     config_validator_lib
+    result_analyzer_lib
     GTest::gtest_main
 )
 target_compile_definitions(pi_poetry_tests PRIVATE

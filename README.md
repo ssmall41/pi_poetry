@@ -141,6 +141,40 @@ Digits are fetched in chunks of 1,000 (the API maximum per request) and progress
 
 In VSCode, use **Terminal > Run Task > Run: pi_download** — it will prompt for the digit count before running.
 
+### analyze_results
+
+Analyzes a `results.json` file produced by the main pipeline and writes two kinds of output into the same run directory:
+
+- **Per-length phrase files** (`phrases_length_1.txt`, `phrases_length_2.txt`, …) — one file for each distinct phrase length found in the results. Each line lists the phrase's starting character offset followed by its words: `<offset>: word1 word2 … wordN`.
+- **Statistics file** (`statistics.txt`) — phrase counts broken down by length, and the ten longest distinct words found across all phrases with their exact character offsets.
+
+**Compile:**
+
+```bash
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --parallel --target analyze_results
+```
+
+**Usage:**
+
+```
+./build/analyze_results <output_dir>
+```
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `output_dir` | Yes | Path to a run directory that contains `results.json` (e.g. `outputs/run-20260508_143022`). Output files are written into the same directory. |
+
+**Example:**
+
+```bash
+# Run the main pipeline to produce results
+./build/pi_poetry --config config/default.toml
+
+# Analyze the most recent run
+./build/analyze_results outputs/run-20260508_143022
+```
+
 ## Technical Design
 
 See [pi_poetry_tdd_v3.md](pi_poetry_tdd_v3.md) for the full technical design document.
