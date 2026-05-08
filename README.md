@@ -71,7 +71,7 @@ The configuration file is a [TOML](https://toml.io/) document passed via `--conf
 |-------|---------|--------------|-------------|
 | `type` * | `"aho-corasick-cpu"` | `"aho-corasick-cpu"` | Word-finder implementation to use. |
 | `dictionary` | `"dictionaries/english.txt"` | Any file path | Path to the word list, one word per line. |
-| `overlap_policy` | `"earliest-then-longest"` | `"earliest-then-longest"`, `"all-combos"` | How to resolve overlapping word matches. `"earliest-then-longest"` greedily picks one sequence: the match starting soonest, with ties broken by longest word. `"all-combos"` returns every possible consecutive chain of words, deduplicated and sorted by offset then first word; use this to explore all valid readings of the letter sequence. |
+| `overlap_policy` | `"earliest-then-longest"` | `"earliest-then-longest"`, `"all-combos"` | How to resolve overlapping word matches. `"earliest-then-longest"` greedily picks one sequence: the match starting soonest, with ties broken by longest word. `"all-combos"` returns every possible consecutive chain of words, deduplicated and sorted by offset then first word; use this to explore all valid readings of the letter sequence. Note: `"all-combos"` only chains words that are directly adjacent (zero gap); the `max_gap` setting in `[phrase_scanner]` is ignored. |
 | `min_word_length` | `3` | Positive integer | Words shorter than this are ignored. |
 | `threads` * | `1` | Positive integer | Worker threads for the word finder. |
 
@@ -81,7 +81,7 @@ The configuration file is a [TOML](https://toml.io/) document passed via `--conf
 |-------|---------|--------------|-------------|
 | `type` * | `"human-review"` | `"human-review"` | Phrase-scanner implementation to use. |
 | `mode` * | `"gap-tolerant"` | `"gap-tolerant"` | How gaps between consecutive words are treated. |
-| `max_gap` | `5` | Non-negative integer | Maximum number of unmapped characters allowed between two consecutive words for them to be grouped into the same phrase. |
+| `max_gap` | `5` | Non-negative integer | Maximum number of unmapped characters allowed between two consecutive words for them to be grouped into the same phrase. Has no effect when `[word_finder] overlap_policy = "all-combos"`, which only produces zero-gap sequences. |
 | `threads` * | `1` | Positive integer | Worker threads for the phrase scanner. |
 
 \* Reserved — parsed but not yet used.
