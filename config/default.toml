@@ -6,7 +6,7 @@ mode = "serial"
 
 [digit_source]
 type = "file"
-path = "data/whale.txt"
+path = "data/pi_2000.txt"
 threads = 1
 
 [digit_mapper]
@@ -18,8 +18,8 @@ write_letter_sequence = true
 
 [word_finder]
 type = "aho-corasick-cpu"
-dictionary = "dictionaries/english.txt"
-overlap_policy = "allcombos"
+dictionary = "dictionaries/english_trimmed.txt"
+overlap_policy = "all-combos"
 min_word_length = 1
 threads = 1
 

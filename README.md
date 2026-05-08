@@ -90,6 +90,8 @@ The configuration file is a [TOML](https://toml.io/) document passed via `--conf
 
 `dictionaries/english.txt` is derived from the [SCOWL](http://wordlist.aspell.net/) (Spelling Checker Oriented Word Lists) large American English word list, distributed via the `wamerican-large` Debian package. SCOWL is made available under a permissive open-source licence — see [SCOWL copyright](http://wordlist.aspell.net/scowl-readme/) for details. Only lowercase words are retained.
 
+`dictionaries/english_trimmed.txt` is a filtered version of `english.txt` with all 1- and 2-letter words removed, except for common ones: `a`, `i`, `am`, `an`, `as`, `at`, `aw`, `ax`, `be`, `by`, `do`, `ex`, `ha`, `hi`, `if`, `in`, `is`, `it`, `my`, `no`, `of`, `oh`, `on`, `or`, `ox`, `pi`, `so`, `to`, `uh`, `um`, `up`, `us`, `we`. Use this dictionary to reduce noise from obscure short words in results.
+
 ## Project Structure
 
 ```
