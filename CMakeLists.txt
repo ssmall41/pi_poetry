@@ -53,9 +53,14 @@ target_link_libraries(pipeline_lib PUBLIC
     digit_source_lib digit_mapper_lib word_finder_lib phrase_scanner_lib)
 target_compile_options(pipeline_lib PRIVATE -Wall -Wextra -Wpedantic)
 
+add_library(config_validator_lib STATIC src/config_validator.cpp)
+target_include_directories(config_validator_lib PUBLIC ${CMAKE_SOURCE_DIR}/include)
+target_link_libraries(config_validator_lib PUBLIC tomlplusplus::tomlplusplus)
+target_compile_options(config_validator_lib PRIVATE -Wall -Wextra -Wpedantic)
+
 # ── Main executable ───────────────────────────────────────────────────────────
 add_executable(pi_poetry src/main.cpp)
-target_link_libraries(pi_poetry PRIVATE pipeline_lib tomlplusplus::tomlplusplus)
+target_link_libraries(pi_poetry PRIVATE pipeline_lib config_validator_lib tomlplusplus::tomlplusplus)
 target_compile_definitions(pi_poetry PRIVATE
     PI_POETRY_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
 target_compile_options(pi_poetry PRIVATE -Wall -Wextra -Wpedantic)
@@ -82,10 +87,12 @@ add_executable(pi_poetry_tests
     tests/test_phrase_scanner.cpp
     tests/test_pipeline.cpp
     tests/test_integration.cpp
+    tests/test_config_validator.cpp
 )
 target_link_libraries(pi_poetry_tests PRIVATE
     digit_source_lib digit_mapper_lib word_finder_lib phrase_scanner_lib
     pipeline_lib
+    config_validator_lib
     GTest::gtest_main
 )
 target_compile_definitions(pi_poetry_tests PRIVATE

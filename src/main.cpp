@@ -3,6 +3,7 @@
 #include "word_finder/AhoCorasickCPU.hpp"
 #include "phrase_scanner/HumanReviewScanner.hpp"
 #include "pipeline/Pipeline.hpp"
+#include "config_validator.hpp"
 #include <toml++/toml.hpp>
 #include <chrono>
 #include <ctime>
@@ -20,6 +21,13 @@ int main(int argc, char* argv[]) {
 
     try {
         auto config = toml::parse_file(config_path);
+
+        auto errors = validate_config(config);
+        if (!errors.empty()) {
+            for (const auto& e : errors)
+                std::cerr << "Config error: " << e << "\n";
+            return 1;
+        }
 
         std::string digit_path = config["digit_source"]["path"].value_or(
             std::string("data/pi_2000.txt"));
@@ -51,10 +59,6 @@ int main(int argc, char* argv[]) {
         finder.set_min_word_length(min_word_length);
         if (policy_str == "all-combos")
             finder.set_overlap_policy(OverlapPolicy::AllCombos);
-        else if (policy_str != "earliest-then-longest")
-            throw std::runtime_error(
-                "Unknown overlap_policy: \"" + policy_str + "\". "
-                "Valid values: \"earliest-then-longest\", \"all-combos\".");
         finder.load_dictionary(dict_path);
         finder.build();
         HumanReviewScanner scanner(max_gap);

@@ -156,8 +156,9 @@ TEST(Pipeline_AllCombos, SortsByOffsetThenFirstWord) {
         if (first_offset1 == std::string::npos &&
             lines[i].find("Offset 1:") != std::string::npos) first_offset1 = i;
     }
-    if (last_offset0 != std::string::npos && first_offset1 != std::string::npos)
+    if (last_offset0 != std::string::npos && first_offset1 != std::string::npos) {
         EXPECT_LT(last_offset0, first_offset1);
+    }
 
     // Within offset 0: line "Offset 0: a ..." appears before "Offset 0: ab"
     std::size_t line_a  = std::string::npos;
@@ -167,6 +168,7 @@ TEST(Pipeline_AllCombos, SortsByOffsetThenFirstWord) {
             line_a = i;
         if (lines[i] == "Offset 0: ab") line_ab = i;
     }
-    if (line_a != std::string::npos && line_ab != std::string::npos)
+    if (line_a != std::string::npos && line_ab != std::string::npos) {
         EXPECT_LT(line_a, line_ab);
+    }
 }
