@@ -73,6 +73,7 @@ target_compile_options(pi_poetry PRIVATE -Wall -Wextra -Wpedantic)
 # ── Download utility ──────────────────────────────────────────────────────────
 add_executable(pi_download src/download_pi.cpp)
 target_compile_definitions(pi_download PRIVATE CPPHTTPLIB_OPENSSL_SUPPORT)
+target_include_directories(pi_download PRIVATE ${CMAKE_SOURCE_DIR}/include)
 target_link_libraries(pi_download PRIVATE
     httplib::httplib
     nlohmann_json::nlohmann_json
@@ -99,6 +100,7 @@ add_executable(pi_poetry_tests
     tests/test_integration.cpp
     tests/test_config_validator.cpp
     tests/test_analyze_results.cpp
+    tests/test_download_pi.cpp
 )
 target_link_libraries(pi_poetry_tests PRIVATE
     digit_source_lib digit_mapper_lib word_finder_lib phrase_scanner_lib
