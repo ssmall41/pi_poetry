@@ -42,10 +42,19 @@ int main(int argc, char* argv[]) {
 
         std::cout << "Run output: " << run_dir.string() << "\n";
 
+        std::string policy_str = config["word_finder"]["overlap_policy"].value_or(
+            std::string("earliest-then-longest"));
+
         FileDigitSource source(digit_path);
         TwoDigitBlockMapper mapper;
         AhoCorasickCPU finder;
         finder.set_min_word_length(min_word_length);
+        if (policy_str == "all-combos")
+            finder.set_overlap_policy(OverlapPolicy::AllCombos);
+        else if (policy_str != "earliest-then-longest")
+            throw std::runtime_error(
+                "Unknown overlap_policy: \"" + policy_str + "\". "
+                "Valid values: \"earliest-then-longest\", \"all-combos\".");
         finder.load_dictionary(dict_path);
         finder.build();
         HumanReviewScanner scanner(max_gap);

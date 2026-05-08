@@ -8,9 +8,9 @@ class AhoCorasickCPU final : public WordFinder {
 public:
     AhoCorasickCPU();
 
-    std::vector<WordMatch> scan(const char* char_buffer,
-                                std::size_t buf_len,
-                                std::size_t offset) override;
+    std::vector<std::vector<WordMatch>> scan(const char* char_buffer,
+                                             std::size_t buf_len,
+                                             std::size_t offset) override;
     void load_dictionary(const std::string& path) override;
     void set_overlap_policy(OverlapPolicy policy) override;
     void set_min_word_length(std::size_t min_len);
@@ -37,7 +37,11 @@ private:
     std::size_t prev_match_end_{0};
     bool built_{false};
 
-    std::vector<WordMatch> apply_earliest_then_longest(
+    std::vector<std::vector<WordMatch>> apply_earliest_then_longest(
         std::vector<std::pair<std::size_t, std::string>>& raw,
+        std::size_t global_offset);
+
+    std::vector<std::vector<WordMatch>> apply_all_combos(
+        const std::vector<std::pair<std::size_t, std::string>>& raw,
         std::size_t global_offset);
 };

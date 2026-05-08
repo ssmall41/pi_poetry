@@ -19,8 +19,8 @@ write_letter_sequence = true
 [word_finder]
 type = "aho-corasick-cpu"
 dictionary = "dictionaries/english.txt"
-overlap_policy = "allcombos"
-min_word_length = 1
+overlap_policy = "earliest-then-longest"
+min_word_length = 3
 threads = 1
 
 [phrase_scanner]

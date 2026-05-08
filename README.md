@@ -71,7 +71,7 @@ The configuration file is a [TOML](https://toml.io/) document passed via `--conf
 |-------|---------|--------------|-------------|
 | `type` * | `"aho-corasick-cpu"` | `"aho-corasick-cpu"` | Word-finder implementation to use. |
 | `dictionary` | `"dictionaries/english.txt"` | Any file path | Path to the word list, one word per line. |
-| `overlap_policy` * | `"earliest-then-longest"` | `"earliest-then-longest"` | How to resolve overlapping word matches. `"earliest-then-longest"` picks the match starting soonest; ties broken by longest word. |
+| `overlap_policy` | `"earliest-then-longest"` | `"earliest-then-longest"`, `"all-combos"` | How to resolve overlapping word matches. `"earliest-then-longest"` greedily picks one sequence: the match starting soonest, with ties broken by longest word. `"all-combos"` returns every possible consecutive chain of words, deduplicated and sorted by offset then first word; use this to explore all valid readings of the letter sequence. |
 | `min_word_length` | `3` | Positive integer | Words shorter than this are ignored. |
 | `threads` * | `1` | Positive integer | Worker threads for the word finder. |
 

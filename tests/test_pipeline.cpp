@@ -78,3 +78,95 @@ TEST(Pipeline_RunDir, LettersFileContainsExpectedContent) {
                           std::istreambuf_iterator<char>());
     EXPECT_EQ(contents, "fphab\n");
 }
+
+// --- AllCombos: all sequences are written to results ---
+
+// "0001" → TwoDigitBlockMapper → "ab" (a=0%26='a', b=1%26='b')
+// AllCombos with {a, ab, b} yields sequences: [a], [a,b], [ab], [b]
+// process_words (max_gap=0): "a"@0, "a b [gaps: 0]"@0, "ab"@0, "b"@1
+// After dedup+sort: 4 distinct phrases; ETL would only produce 1
+
+TEST(Pipeline_AllCombos, ProducesAllSequencesInResults) {
+    auto digit_file = make_temp_digit_file("0001");
+    auto run_dir    = std::filesystem::temp_directory_path() / "pi_allcombos_test";
+    std::filesystem::create_directories(run_dir);
+
+    FileDigitSource source(digit_file.string());
+    TwoDigitBlockMapper mapper;
+    AhoCorasickCPU finder;
+    finder.insert_word("a");
+    finder.insert_word("ab");
+    finder.insert_word("b");
+    finder.build();
+    finder.set_overlap_policy(OverlapPolicy::AllCombos);
+    HumanReviewScanner scanner(0);
+
+    Pipeline pipeline(source, mapper, finder, scanner);
+    pipeline.run(run_dir);
+
+    std::ifstream f(run_dir / "results.txt");
+    ASSERT_TRUE(f.is_open());
+    std::string contents((std::istreambuf_iterator<char>(f)),
+                          std::istreambuf_iterator<char>());
+    std::filesystem::remove_all(run_dir);
+
+    EXPECT_NE(contents.find("Offset 0: ab\n"),      std::string::npos);
+    EXPECT_NE(contents.find("Offset 0: a b"),        std::string::npos);
+    EXPECT_NE(contents.find("Offset 1: b\n"),        std::string::npos);
+
+    int lines = 0;
+    for (char c : contents) if (c == '\n') ++lines;
+    EXPECT_GT(lines, 1);
+}
+
+TEST(Pipeline_AllCombos, SortsByOffsetThenFirstWord) {
+    // Within the same offset, phrases are ordered by their first word alphabetically.
+    // "a ..." (first word "a") < "ab" (first word "ab") — expect "a" lines to precede "ab" line.
+    auto digit_file = make_temp_digit_file("0001");
+    auto run_dir    = std::filesystem::temp_directory_path() / "pi_sort_test";
+    std::filesystem::create_directories(run_dir);
+
+    FileDigitSource source(digit_file.string());
+    TwoDigitBlockMapper mapper;
+    AhoCorasickCPU finder;
+    finder.insert_word("a");
+    finder.insert_word("ab");
+    finder.insert_word("b");
+    finder.build();
+    finder.set_overlap_policy(OverlapPolicy::AllCombos);
+    HumanReviewScanner scanner(0);
+
+    Pipeline pipeline(source, mapper, finder, scanner);
+    pipeline.run(run_dir);
+
+    std::ifstream f(run_dir / "results.txt");
+    ASSERT_TRUE(f.is_open());
+    std::vector<std::string> lines;
+    std::string line;
+    while (std::getline(f, line)) if (!line.empty()) lines.push_back(line);
+    std::filesystem::remove_all(run_dir);
+
+    ASSERT_GE(lines.size(), 3u);
+
+    // All Offset-0 lines come before Offset-1 lines
+    auto last_offset0 = std::string::npos;
+    auto first_offset1 = std::string::npos;
+    for (std::size_t i = 0; i < lines.size(); ++i) {
+        if (lines[i].find("Offset 0:") != std::string::npos) last_offset0 = i;
+        if (first_offset1 == std::string::npos &&
+            lines[i].find("Offset 1:") != std::string::npos) first_offset1 = i;
+    }
+    if (last_offset0 != std::string::npos && first_offset1 != std::string::npos)
+        EXPECT_LT(last_offset0, first_offset1);
+
+    // Within offset 0: line "Offset 0: a ..." appears before "Offset 0: ab"
+    std::size_t line_a  = std::string::npos;
+    std::size_t line_ab = std::string::npos;
+    for (std::size_t i = 0; i < lines.size(); ++i) {
+        if (lines[i].find("Offset 0: a ") != std::string::npos && line_a == std::string::npos)
+            line_a = i;
+        if (lines[i] == "Offset 0: ab") line_ab = i;
+    }
+    if (line_a != std::string::npos && line_ab != std::string::npos)
+        EXPECT_LT(line_a, line_ab);
+}
