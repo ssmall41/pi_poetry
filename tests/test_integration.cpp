@@ -48,12 +48,12 @@ TEST(DigitSeqIntegration, Seq1_WordsFound) {
     auto ac = build_finder(2);
     auto w = ac.scan(letters.data(), letters.size(), 0);
 
-    ASSERT_EQ(w.size(), 5u);
-    EXPECT_EQ(w[0].word, "taw");   EXPECT_EQ(w[0].start,  3u); EXPECT_FALSE(w[0].consecutive);
-    EXPECT_EQ(w[1].word, "hale");  EXPECT_EQ(w[1].start,  6u); EXPECT_TRUE(w[1].consecutive);
-    EXPECT_EQ(w[2].word, "of");    EXPECT_EQ(w[2].start, 10u); EXPECT_TRUE(w[2].consecutive);
-    EXPECT_EQ(w[3].word, "at");    EXPECT_EQ(w[3].start, 12u); EXPECT_TRUE(w[3].consecutive);
-    EXPECT_EQ(w[4].word, "ale");   EXPECT_EQ(w[4].start, 14u); EXPECT_TRUE(w[4].consecutive);
+    ASSERT_EQ(w[0].size(), 5u);
+    EXPECT_EQ(w[0][0].word, "taw");   EXPECT_EQ(w[0][0].start,  3u); EXPECT_FALSE(w[0][0].consecutive);
+    EXPECT_EQ(w[0][1].word, "hale");  EXPECT_EQ(w[0][1].start,  6u); EXPECT_TRUE(w[0][1].consecutive);
+    EXPECT_EQ(w[0][2].word, "of");    EXPECT_EQ(w[0][2].start, 10u); EXPECT_TRUE(w[0][2].consecutive);
+    EXPECT_EQ(w[0][3].word, "at");    EXPECT_EQ(w[0][3].start, 12u); EXPECT_TRUE(w[0][3].consecutive);
+    EXPECT_EQ(w[0][4].word, "ale");   EXPECT_EQ(w[0][4].start, 14u); EXPECT_TRUE(w[0][4].consecutive);
 }
 
 TEST(DigitSeqIntegration, Seq1_PhrasesFound) {
@@ -61,7 +61,7 @@ TEST(DigitSeqIntegration, Seq1_PhrasesFound) {
     auto ac = build_finder(2);
     auto words = ac.scan(letters.data(), letters.size(), 0);
     HumanReviewScanner hs;
-    auto phrases = hs.process_words(words);
+    auto phrases = hs.process_words(words[0]);
 
     ASSERT_EQ(phrases.size(), 1u);
     EXPECT_EQ(phrases[0].start_offset, 3u);
@@ -83,11 +83,11 @@ TEST(DigitSeqIntegration, Seq2_WordsFound) {
     auto ac = build_finder(2);
     auto w = ac.scan(letters.data(), letters.size(), 0);
 
-    ASSERT_EQ(w.size(), 4u);
-    EXPECT_EQ(w[0].word, "whale"); EXPECT_EQ(w[0].start,  4u); EXPECT_FALSE(w[0].consecutive);
-    EXPECT_EQ(w[1].word, "of");    EXPECT_EQ(w[1].start,  9u); EXPECT_TRUE(w[1].consecutive);
-    EXPECT_EQ(w[2].word, "at");    EXPECT_EQ(w[2].start, 11u); EXPECT_TRUE(w[2].consecutive);
-    EXPECT_EQ(w[3].word, "ale");   EXPECT_EQ(w[3].start, 13u); EXPECT_TRUE(w[3].consecutive);
+    ASSERT_EQ(w[0].size(), 4u);
+    EXPECT_EQ(w[0][0].word, "whale"); EXPECT_EQ(w[0][0].start,  4u); EXPECT_FALSE(w[0][0].consecutive);
+    EXPECT_EQ(w[0][1].word, "of");    EXPECT_EQ(w[0][1].start,  9u); EXPECT_TRUE(w[0][1].consecutive);
+    EXPECT_EQ(w[0][2].word, "at");    EXPECT_EQ(w[0][2].start, 11u); EXPECT_TRUE(w[0][2].consecutive);
+    EXPECT_EQ(w[0][3].word, "ale");   EXPECT_EQ(w[0][3].start, 13u); EXPECT_TRUE(w[0][3].consecutive);
 }
 
 TEST(DigitSeqIntegration, Seq2_PhrasesFound) {
@@ -95,7 +95,7 @@ TEST(DigitSeqIntegration, Seq2_PhrasesFound) {
     auto ac = build_finder(2);
     auto words = ac.scan(letters.data(), letters.size(), 0);
     HumanReviewScanner hs;
-    auto phrases = hs.process_words(words);
+    auto phrases = hs.process_words(words[0]);
 
     ASSERT_EQ(phrases.size(), 1u);
     EXPECT_EQ(phrases[0].start_offset, 4u);
@@ -117,11 +117,11 @@ TEST(DigitSeqIntegration, Seq3_WordsFound) {
     auto ac = build_finder(2);
     auto w = ac.scan(letters.data(), letters.size(), 0);
 
-    ASSERT_EQ(w.size(), 4u);
-    EXPECT_EQ(w[0].word, "whale"); EXPECT_EQ(w[0].start,  4u); EXPECT_FALSE(w[0].consecutive);
-    EXPECT_EQ(w[1].word, "of");    EXPECT_EQ(w[1].start,  9u); EXPECT_TRUE(w[1].consecutive);
-    EXPECT_EQ(w[2].word, "at");    EXPECT_EQ(w[2].start, 11u); EXPECT_TRUE(w[2].consecutive);
-    EXPECT_EQ(w[3].word, "ale");   EXPECT_EQ(w[3].start, 13u); EXPECT_TRUE(w[3].consecutive);
+    ASSERT_EQ(w[0].size(), 4u);
+    EXPECT_EQ(w[0][0].word, "whale"); EXPECT_EQ(w[0][0].start,  4u); EXPECT_FALSE(w[0][0].consecutive);
+    EXPECT_EQ(w[0][1].word, "of");    EXPECT_EQ(w[0][1].start,  9u); EXPECT_TRUE(w[0][1].consecutive);
+    EXPECT_EQ(w[0][2].word, "at");    EXPECT_EQ(w[0][2].start, 11u); EXPECT_TRUE(w[0][2].consecutive);
+    EXPECT_EQ(w[0][3].word, "ale");   EXPECT_EQ(w[0][3].start, 13u); EXPECT_TRUE(w[0][3].consecutive);
 }
 
 TEST(DigitSeqIntegration, Seq3_PhrasesFound) {
@@ -129,7 +129,7 @@ TEST(DigitSeqIntegration, Seq3_PhrasesFound) {
     auto ac = build_finder(2);
     auto words = ac.scan(letters.data(), letters.size(), 0);
     HumanReviewScanner hs;
-    auto phrases = hs.process_words(words);
+    auto phrases = hs.process_words(words[0]);
 
     ASSERT_EQ(phrases.size(), 1u);
     EXPECT_EQ(phrases[0].start_offset, 4u);
@@ -150,9 +150,9 @@ TEST(DigitSeqIntegration, Seq4_WordsFound) {
     auto ac = build_finder(1);
     auto w = ac.scan(letters.data(), letters.size(), 0);
 
-    ASSERT_EQ(w.size(), 2u);
-    EXPECT_EQ(w[0].word, "armor"); EXPECT_EQ(w[0].start, 0u); EXPECT_FALSE(w[0].consecutive);
-    EXPECT_EQ(w[1].word, "e");     EXPECT_EQ(w[1].start, 5u); EXPECT_TRUE(w[1].consecutive);
+    ASSERT_EQ(w[0].size(), 2u);
+    EXPECT_EQ(w[0][0].word, "armor"); EXPECT_EQ(w[0][0].start, 0u); EXPECT_FALSE(w[0][0].consecutive);
+    EXPECT_EQ(w[0][1].word, "e");     EXPECT_EQ(w[0][1].start, 5u); EXPECT_TRUE(w[0][1].consecutive);
 }
 
 TEST(DigitSeqIntegration, Seq4_PhrasesFound) {
@@ -160,7 +160,7 @@ TEST(DigitSeqIntegration, Seq4_PhrasesFound) {
     auto ac = build_finder(1);
     auto words = ac.scan(letters.data(), letters.size(), 0);
     HumanReviewScanner hs;
-    auto phrases = hs.process_words(words);
+    auto phrases = hs.process_words(words[0]);
 
     ASSERT_EQ(phrases.size(), 1u);
     EXPECT_EQ(phrases[0].start_offset, 0u);
@@ -181,9 +181,9 @@ TEST(DigitSeqIntegration, Seq5_WordsFound) {
     auto ac = build_finder(1);
     auto w = ac.scan(letters.data(), letters.size(), 0);
 
-    ASSERT_EQ(w.size(), 2u);
-    EXPECT_EQ(w[0].word, "flagstaff"); EXPECT_EQ(w[0].start, 0u); EXPECT_FALSE(w[0].consecutive);
-    EXPECT_EQ(w[1].word, "er");        EXPECT_EQ(w[1].start, 9u); EXPECT_TRUE(w[1].consecutive);
+    ASSERT_EQ(w[0].size(), 2u);
+    EXPECT_EQ(w[0][0].word, "flagstaff"); EXPECT_EQ(w[0][0].start, 0u); EXPECT_FALSE(w[0][0].consecutive);
+    EXPECT_EQ(w[0][1].word, "er");        EXPECT_EQ(w[0][1].start, 9u); EXPECT_TRUE(w[0][1].consecutive);
 }
 
 TEST(DigitSeqIntegration, Seq5_PhrasesFound) {
@@ -191,7 +191,7 @@ TEST(DigitSeqIntegration, Seq5_PhrasesFound) {
     auto ac = build_finder(1);
     auto words = ac.scan(letters.data(), letters.size(), 0);
     HumanReviewScanner hs;
-    auto phrases = hs.process_words(words);
+    auto phrases = hs.process_words(words[0]);
 
     ASSERT_EQ(phrases.size(), 1u);
     EXPECT_EQ(phrases[0].start_offset, 0u);
@@ -213,12 +213,12 @@ TEST(DigitSeqIntegration, Seq6_WordsFound) {
     auto ac = build_finder(2);
     auto w = ac.scan(letters.data(), letters.size(), 0);
 
-    ASSERT_EQ(w.size(), 5u);
-    EXPECT_EQ(w[0].word, "flag"); EXPECT_EQ(w[0].start,  0u); EXPECT_FALSE(w[0].consecutive);
-    EXPECT_EQ(w[1].word, "gs");   EXPECT_EQ(w[1].start,  4u); EXPECT_TRUE(w[1].consecutive);
-    EXPECT_EQ(w[2].word, "ta");   EXPECT_EQ(w[2].start,  6u); EXPECT_TRUE(w[2].consecutive);
-    EXPECT_EQ(w[3].word, "ff");   EXPECT_EQ(w[3].start,  8u); EXPECT_TRUE(w[3].consecutive);
-    EXPECT_EQ(w[4].word, "er");   EXPECT_EQ(w[4].start, 10u); EXPECT_TRUE(w[4].consecutive);
+    ASSERT_EQ(w[0].size(), 5u);
+    EXPECT_EQ(w[0][0].word, "flag"); EXPECT_EQ(w[0][0].start,  0u); EXPECT_FALSE(w[0][0].consecutive);
+    EXPECT_EQ(w[0][1].word, "gs");   EXPECT_EQ(w[0][1].start,  4u); EXPECT_TRUE(w[0][1].consecutive);
+    EXPECT_EQ(w[0][2].word, "ta");   EXPECT_EQ(w[0][2].start,  6u); EXPECT_TRUE(w[0][2].consecutive);
+    EXPECT_EQ(w[0][3].word, "ff");   EXPECT_EQ(w[0][3].start,  8u); EXPECT_TRUE(w[0][3].consecutive);
+    EXPECT_EQ(w[0][4].word, "er");   EXPECT_EQ(w[0][4].start, 10u); EXPECT_TRUE(w[0][4].consecutive);
 }
 
 TEST(DigitSeqIntegration, Seq6_PhrasesFound) {
@@ -226,7 +226,7 @@ TEST(DigitSeqIntegration, Seq6_PhrasesFound) {
     auto ac = build_finder(2);
     auto words = ac.scan(letters.data(), letters.size(), 0);
     HumanReviewScanner hs;
-    auto phrases = hs.process_words(words);
+    auto phrases = hs.process_words(words[0]);
 
     ASSERT_EQ(phrases.size(), 1u);
     EXPECT_EQ(phrases[0].start_offset, 0u);

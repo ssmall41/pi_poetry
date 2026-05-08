@@ -12,7 +12,7 @@ struct WordMatch {
 
 enum class OverlapPolicy {
     EarliestThenLongest,
-    AllStarts,  // future
+    AllCombos,
 };
 
 class WordFinder {
@@ -21,9 +21,10 @@ public:
 
     // Scans char_buffer (buf_len chars, global offset `offset`) and
     // returns word matches per the current overlap policy.
-    virtual std::vector<WordMatch> scan(const char* char_buffer,
-                                        std::size_t buf_len,
-                                        std::size_t offset) = 0;
+    // EarliestThenLongest returns one inner sequence; AllCombos returns all.
+    virtual std::vector<std::vector<WordMatch>> scan(const char* char_buffer,
+                                                     std::size_t buf_len,
+                                                     std::size_t offset) = 0;
 
     // Loads a plain-text word list (one word per line).
     virtual void load_dictionary(const std::string& path) = 0;

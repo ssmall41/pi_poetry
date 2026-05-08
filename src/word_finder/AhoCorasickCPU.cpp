@@ -2,7 +2,9 @@
 #include <algorithm>
 #include <cassert>
 #include <fstream>
+#include <functional>
 #include <limits>
+#include <map>
 #include <queue>
 #include <string>
 
@@ -77,9 +79,9 @@ void AhoCorasickCPU::set_min_word_length(std::size_t min_len) {
     min_word_length_ = min_len;
 }
 
-std::vector<WordMatch> AhoCorasickCPU::scan(const char* char_buffer,
-                                             std::size_t buf_len,
-                                             std::size_t offset) {
+std::vector<std::vector<WordMatch>> AhoCorasickCPU::scan(const char* char_buffer,
+                                                          std::size_t buf_len,
+                                                          std::size_t offset) {
     assert(built_ && "build() must be called before scan()");
 
     // Collect all AC matches as (start_position, word)
@@ -107,10 +109,12 @@ std::vector<WordMatch> AhoCorasickCPU::scan(const char* char_buffer,
         }
     }
 
+    if (policy_ == OverlapPolicy::AllCombos)
+        return apply_all_combos(raw, offset);
     return apply_earliest_then_longest(raw, offset);
 }
 
-std::vector<WordMatch> AhoCorasickCPU::apply_earliest_then_longest(
+std::vector<std::vector<WordMatch>> AhoCorasickCPU::apply_earliest_then_longest(
     std::vector<std::pair<std::size_t, std::string>>& raw,
     std::size_t global_offset) {
 
@@ -129,11 +133,45 @@ std::vector<WordMatch> AhoCorasickCPU::apply_earliest_then_longest(
         if (local_start < scan_pos) continue;  // consumed by earlier selection
 
         std::size_t global_start = global_offset + local_start;
+        // prev_match_end_ is ETL-only state; not used by AllCombos
         bool consecutive = (global_start == prev_match_end_);
         result.push_back({word, global_start, word.size(), consecutive});
 
         scan_pos = local_start + word.size();
         prev_match_end_ = global_start + word.size();
+    }
+
+    return { result };
+}
+
+std::vector<std::vector<WordMatch>> AhoCorasickCPU::apply_all_combos(
+    const std::vector<std::pair<std::size_t, std::string>>& raw,
+    std::size_t global_offset) {
+
+    // Build: start_pos -> [(word, end_pos)]
+    std::map<std::size_t, std::vector<std::pair<std::string, std::size_t>>> by_start;
+    for (const auto& [start, word] : raw)
+        by_start[start].emplace_back(word, start + word.size());
+
+    std::vector<std::vector<WordMatch>> result;
+
+    std::function<void(std::size_t, std::vector<WordMatch>&)> dfs =
+        [&](std::size_t pos, std::vector<WordMatch>& current) {
+            auto it = by_start.find(pos);
+            if (it == by_start.end()) return;
+            for (const auto& [word, end_pos] : it->second) {
+                WordMatch m{word, global_offset + pos, word.size(),
+                            !current.empty()};
+                current.push_back(m);
+                result.push_back(current);
+                dfs(end_pos, current);
+                current.pop_back();
+            }
+        };
+
+    for (const auto& [start, _] : by_start) {
+        std::vector<WordMatch> current;
+        dfs(start, current);
     }
 
     return result;
