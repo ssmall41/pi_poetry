@@ -5,8 +5,10 @@
 #include "word_finder/AhoCorasickCPU.hpp"
 #include "phrase_scanner/HumanReviewScanner.hpp"
 #include "result_analyzer/ResultAnalyzer.hpp"
+#include <nlohmann/json.hpp>
 #include <filesystem>
 #include <fstream>
+#include <set>
 #include <string>
 
 namespace {
@@ -174,6 +176,65 @@ TEST(Pipeline_AllCombos, SortsByOffsetThenFirstWord) {
     }
 }
 
+// ── Overlap policy: ETL ⊆ AllCombos ─────────────────────────────────────────
+
+TEST(Pipeline_OverlapPolicy, ETLPhrasesAreSubsetOfAllCombos) {
+    namespace fs = std::filesystem;
+    using Phrases = std::set<std::pair<std::size_t, std::vector<std::string>>>;
+
+    auto parse_phrases = [](const fs::path& dir) {
+        std::ifstream f(dir / "results.json");
+        auto j = nlohmann::json::parse(f);
+        Phrases result;
+        for (const auto& p : j["phrases"])
+            result.insert({p["start_offset"].get<std::size_t>(),
+                           p["words"].get<std::vector<std::string>>()});
+        return result;
+    };
+
+    const std::string dict = PI_POETRY_SOURCE_DIR "/dictionaries/english_trimmed.txt";
+    const std::string pi   = PI_POETRY_SOURCE_DIR "/data/pi_2000.txt";
+
+    auto etl_dir = fs::temp_directory_path() / "pi_etl_subset_test";
+    auto ac_dir  = fs::temp_directory_path() / "pi_ac_subset_test";
+    fs::create_directories(etl_dir);
+    fs::create_directories(ac_dir);
+
+    {   // ETL run (default policy, max_gap=0 for consecutive-only phrases)
+        FileDigitSource source(pi);
+        TwoDigitBlockMapper mapper;
+        AhoCorasickCPU finder;
+        finder.load_dictionary(dict);
+        finder.build();
+        HumanReviewScanner scanner{0};
+        Pipeline{source, mapper, finder, scanner}.run(etl_dir);
+    }
+    {   // AllCombos run (max_gap=0 for consecutive-only phrases)
+        FileDigitSource source(pi);
+        TwoDigitBlockMapper mapper;
+        AhoCorasickCPU finder;
+        finder.set_overlap_policy(OverlapPolicy::AllCombos);
+        finder.load_dictionary(dict);
+        finder.build();
+        HumanReviewScanner scanner{0};
+        Pipeline{source, mapper, finder, scanner}.run(ac_dir);
+    }
+
+    auto etl_phrases = parse_phrases(etl_dir);
+    auto ac_phrases  = parse_phrases(ac_dir);
+    fs::remove_all(etl_dir);
+    fs::remove_all(ac_dir);
+
+    for (const auto& [offset, words] : etl_phrases) {
+        std::string word_list;
+        for (const auto& w : words)
+            word_list += (word_list.empty() ? "" : ", ") + w;
+        EXPECT_TRUE(ac_phrases.count({offset, words}) > 0)
+            << "ETL phrase missing from AllCombos — offset=" << offset
+            << " words=[" << word_list << "]";
+    }
+}
+
 // ── Pipeline + analysis integration ──────────────────────────────────────────
 
 TEST(Pipeline_Analysis, AnalyzeAfterRunProducesStatisticsAndPhraseLengthFiles) {
@@ -185,7 +246,7 @@ TEST(Pipeline_Analysis, AnalyzeAfterRunProducesStatisticsAndPhraseLengthFiles) {
     FileDigitSource source(digit_file.string());
     TwoDigitBlockMapper mapper;
     AhoCorasickCPU finder;
-    finder.load_dictionary(PI_POETRY_SOURCE_DIR "/dictionaries/english.txt");
+    finder.load_dictionary(PI_POETRY_SOURCE_DIR "/dictionaries/english_trimmed.txt");
     finder.build();
     HumanReviewScanner scanner(5);
 
