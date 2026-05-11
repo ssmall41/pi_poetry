@@ -3,6 +3,7 @@
 #include "word_finder/AhoCorasickCPU.hpp"
 #include "phrase_scanner/HumanReviewScanner.hpp"
 #include "pipeline/Pipeline.hpp"
+#include "result_analyzer/ResultAnalyzer.hpp"
 #include "config_validator.hpp"
 #include <toml++/toml.hpp>
 #include <chrono>
@@ -40,6 +41,7 @@ int main(int argc, char* argv[]) {
             std::size_t{1});
         std::string out_dir = config["output"]["dir"].value_or(std::string("outputs"));
         bool write_letter_sequence = config["digit_mapper"]["write_letter_sequence"].value_or(false);
+        bool run_analysis = config["analysis"]["run_after_pipeline"].value_or(false);
 
         auto now = std::chrono::system_clock::now();
         std::time_t t = std::chrono::system_clock::to_time_t(now);
@@ -67,13 +69,27 @@ int main(int argc, char* argv[]) {
 
         Pipeline pipeline(source, mapper, finder, scanner);
         pipeline.run(run_dir, write_letter_sequence);
+        auto pipeline_end = std::chrono::steady_clock::now();
+
+        if (run_analysis) {
+            result_analyzer::analyze(run_dir);
+            auto total_end  = std::chrono::steady_clock::now();
+            auto pipeline_s = std::chrono::duration<double>(pipeline_end - start).count();
+            auto analysis_s = std::chrono::duration<double>(total_end - pipeline_end).count();
+            auto total_s    = std::chrono::duration<double>(total_end - start).count();
+            std::cout << "Pipeline time:  " << std::fixed << std::setprecision(3) << pipeline_s << "s\n";
+            std::cout << "Analysis time:  " << std::fixed << std::setprecision(3) << analysis_s << "s\n";
+            std::cout << "Total time:     " << std::fixed << std::setprecision(3) << total_s    << "s\n";
+        } else {
+            auto elapsed = std::chrono::duration<double>(pipeline_end - start).count();
+            std::cout << "Pipeline time:  " << std::fixed << std::setprecision(3) << elapsed << "s\n";
+            std::cout << "Total time:     " << std::fixed << std::setprecision(3) << elapsed << "s\n";
+        }
     } catch (const std::exception& ex) {
         std::cerr << "Error: " << ex.what() << "\n";
         auto elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
         std::cout << "Total time: " << std::fixed << std::setprecision(3) << elapsed << "s\n";
         return 1;
     }
-    auto elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
-    std::cout << "Total time: " << std::fixed << std::setprecision(3) << elapsed << "s\n";
     return 0;
 }

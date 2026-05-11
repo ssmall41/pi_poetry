@@ -289,3 +289,33 @@ TEST(ConfigValidator, WrongTypeForIntegerField) {
     ASSERT_EQ(errors.size(), 1u);
     EXPECT_TRUE(any_error_contains(errors, "digit_mapper.base"));
 }
+
+// ── [analysis] section ────────────────────────────────────────────────────────
+
+TEST(ConfigValidator, AnalysisSectionAbsentIsValid) {
+    auto cfg = make_valid_table();
+    EXPECT_TRUE(validate_config(cfg).empty());
+}
+
+TEST(ConfigValidator, AnalysisRunAfterPipelineFalseIsValid) {
+    auto cfg = make_valid_table();
+    cfg.insert_or_assign("analysis", toml::table{});
+    cfg["analysis"].as_table()->insert_or_assign("run_after_pipeline", false);
+    EXPECT_TRUE(validate_config(cfg).empty());
+}
+
+TEST(ConfigValidator, AnalysisRunAfterPipelineTrueIsValid) {
+    auto cfg = make_valid_table();
+    cfg.insert_or_assign("analysis", toml::table{});
+    cfg["analysis"].as_table()->insert_or_assign("run_after_pipeline", true);
+    EXPECT_TRUE(validate_config(cfg).empty());
+}
+
+TEST(ConfigValidator, AnalysisRunAfterPipelineWrongTypeIsInvalid) {
+    auto cfg = make_valid_table();
+    cfg.insert_or_assign("analysis", toml::table{});
+    cfg["analysis"].as_table()->insert_or_assign("run_after_pipeline", "yes");
+    auto errors = validate_config(cfg);
+    ASSERT_EQ(errors.size(), 1u);
+    EXPECT_TRUE(any_error_contains(errors, "analysis.run_after_pipeline"));
+}

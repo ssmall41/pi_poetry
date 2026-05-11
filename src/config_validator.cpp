@@ -92,5 +92,11 @@ std::vector<std::string> validate_config(const toml::table& config) {
             errors.push_back("word_finder.dictionary: file not found: \"" + path + "\"");
     }
 
+    {
+        auto node = config["analysis"]["run_after_pipeline"];
+        if (node && !node.as_boolean())
+            errors.push_back("analysis.run_after_pipeline: must be a boolean");
+    }
+
     return errors;
 }

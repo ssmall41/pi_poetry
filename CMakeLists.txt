@@ -65,7 +65,7 @@ target_compile_options(config_validator_lib PRIVATE -Wall -Wextra -Wpedantic)
 
 # ── Main executable ───────────────────────────────────────────────────────────
 add_executable(pi_poetry src/main.cpp)
-target_link_libraries(pi_poetry PRIVATE pipeline_lib config_validator_lib tomlplusplus::tomlplusplus)
+target_link_libraries(pi_poetry PRIVATE pipeline_lib config_validator_lib result_analyzer_lib tomlplusplus::tomlplusplus)
 target_compile_definitions(pi_poetry PRIVATE
     PI_POETRY_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
 target_compile_options(pi_poetry PRIVATE -Wall -Wextra -Wpedantic)
