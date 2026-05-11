@@ -88,9 +88,15 @@ The configuration file is a [TOML](https://toml.io/) document passed via `--conf
 
 ## Dictionary
 
+The following are the dictionaries which come prepackaged with Pi Poetry. Any dictionary can be used. The only requirements are that the dictionary file consists of text with words separated by a newline character. It's not necessary for the words to appear alphabetically.
+
 `dictionaries/english.txt` is derived from the [SCOWL](http://wordlist.aspell.net/) (Spelling Checker Oriented Word Lists) large American English word list, distributed via the `wamerican-large` Debian package. SCOWL is made available under a permissive open-source licence — see [SCOWL copyright](http://wordlist.aspell.net/scowl-readme/) for details. Only lowercase words are retained.
 
 `dictionaries/english_trimmed.txt` is a filtered version of `english.txt` with all 1- and 2-letter words removed, except for common ones: `a`, `i`, `am`, `an`, `as`, `at`, `aw`, `ax`, `be`, `by`, `do`, `ex`, `ha`, `hi`, `if`, `in`, `is`, `it`, `my`, `no`, `of`, `oh`, `on`, `or`, `ox`, `pi`, `so`, `to`, `uh`, `um`, `up`, `us`, `we`. Use this dictionary to reduce noise from obscure short words in results.
+
+`dictionaries/google-10000-english.txt` is the list of the 10,000 most common English words, ordered by frequency, derived from the [Google Trillion Word Corpus](https://github.com/first20hours/google-10000-english). Because it contains only high-frequency everyday words, it produces cleaner, more readable results than the full SCOWL list while still covering a broad vocabulary.
+
+`dictionaries/google-10000-english-trimmed.txt` is a filtered version of `google-10000-english.txt` with all 1- and 2-letter words removed, except for common ones: `a`, `i`, `am`, `an`, `as`, `at`, `aw`, `ax`, `be`, `by`, `do`, `ex`, `ha`, `hi`, `if`, `in`, `is`, `it`, `my`, `no`, `of`, `oh`, `ok`, `on`, `or`, `ox`, `pi`, `so`, `to`, `uh`, `um`, `up`, `us`, `we`. Frequency order is preserved. Use this dictionary to reduce noise from obscure short words in results.
 
 ## Project Structure
 

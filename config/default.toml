@@ -18,7 +18,7 @@ write_letter_sequence = true
 
 [word_finder]
 type = "aho-corasick-cpu"
-dictionary = "dictionaries/english_trimmed.txt"
+dictionary = "dictionaries/google-10000-english-trimmed.txt"
 overlap_policy = "all-combos"
 min_word_length = 1
 threads = 1
