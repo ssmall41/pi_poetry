@@ -7,11 +7,13 @@
 #include <toml++/toml.hpp>
 #include <chrono>
 #include <ctime>
+#include <iomanip>
 #include <filesystem>
 #include <iostream>
 #include <stdexcept>
 
 int main(int argc, char* argv[]) {
+    auto start = std::chrono::steady_clock::now();
     std::string config_path = "config/default.toml";
     for (int i = 1; i + 1 < argc; ++i) {
         if (std::string(argv[i]) == "--config") {
@@ -67,7 +69,11 @@ int main(int argc, char* argv[]) {
         pipeline.run(run_dir, write_letter_sequence);
     } catch (const std::exception& ex) {
         std::cerr << "Error: " << ex.what() << "\n";
+        auto elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
+        std::cout << "Total time: " << std::fixed << std::setprecision(3) << elapsed << "s\n";
         return 1;
     }
+    auto elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
+    std::cout << "Total time: " << std::fixed << std::setprecision(3) << elapsed << "s\n";
     return 0;
 }

@@ -1,4 +1,6 @@
 #include "result_analyzer/ResultAnalyzer.hpp"
+#include <chrono>
+#include <iomanip>
 #include <iostream>
 #include <stdexcept>
 
@@ -13,11 +15,16 @@ int main(int argc, char* argv[]) {
         print_usage(argv[0]);
         return 1;
     }
+    auto start = std::chrono::steady_clock::now();
     try {
         result_analyzer::analyze(argv[1]);
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << '\n';
+        auto elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
+        std::cout << "Total time: " << std::fixed << std::setprecision(3) << elapsed << "s\n";
         return 1;
     }
+    auto elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
+    std::cout << "Total time: " << std::fixed << std::setprecision(3) << elapsed << "s\n";
     return 0;
 }

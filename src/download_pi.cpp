@@ -2,8 +2,10 @@
 #include <nlohmann/json.hpp>
 #include "download_pi_utils.h"
 #include <algorithm>
+#include <chrono>
 #include <cstring>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <string>
 
@@ -108,6 +110,7 @@ static std::string download_pi(int num_digits, int start_offset) {
 
 int main(int argc, char* argv[]) {
     auto args = parse_args(argc, argv);
+    auto start = std::chrono::steady_clock::now();
 
     std::string output;
 
@@ -116,6 +119,8 @@ int main(int argc, char* argv[]) {
         if (!existing.has_value()) {
             std::cerr << "Error: failed to read or validate input file: "
                       << args.input_path << "\n";
+            auto elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
+            std::cout << "Total time: " << std::fixed << std::setprecision(3) << elapsed << "s\n";
             return 1;
         }
 
@@ -130,12 +135,16 @@ int main(int argc, char* argv[]) {
         int additional = args.num_digits - existing_count;
         std::string new_digits = download_pi(additional, existing_count);
         if (new_digits.empty()) {
+            auto elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
+            std::cout << "Total time: " << std::fixed << std::setprecision(3) << elapsed << "s\n";
             return 1;
         }
         output = std::move(*existing) + new_digits;
     } else {
         output = download_pi(args.num_digits, 0);
         if (output.empty()) {
+            auto elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
+            std::cout << "Total time: " << std::fixed << std::setprecision(3) << elapsed << "s\n";
             return 1;
         }
     }
@@ -152,5 +161,7 @@ int main(int argc, char* argv[]) {
     }
 
     std::cout << "Wrote " << output.size() << " digits to " << args.output_path << "\n";
+    auto elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
+    std::cout << "Total time: " << std::fixed << std::setprecision(3) << elapsed << "s\n";
     return 0;
 }
