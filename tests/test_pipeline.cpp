@@ -4,6 +4,7 @@
 #include "digit_mapper/TwoDigitBlockMapper.hpp"
 #include "word_finder/AhoCorasickCPU.hpp"
 #include "phrase_scanner/HumanReviewScanner.hpp"
+#include "result_analyzer/ResultAnalyzer.hpp"
 #include <filesystem>
 #include <fstream>
 #include <string>
@@ -171,4 +172,35 @@ TEST(Pipeline_AllCombos, SortsByOffsetThenFirstWord) {
     if (line_a != std::string::npos && line_ab != std::string::npos) {
         EXPECT_LT(line_a, line_ab);
     }
+}
+
+// ── Pipeline + analysis integration ──────────────────────────────────────────
+
+TEST(Pipeline_Analysis, AnalyzeAfterRunProducesStatisticsAndPhraseLengthFiles) {
+    // Uses the real pi_2000.txt digit file so results.json has real content.
+    std::filesystem::path digit_file{PI_POETRY_SOURCE_DIR "/data/pi_2000.txt"};
+    auto run_dir = std::filesystem::temp_directory_path() / "pi_pipeline_analysis_test";
+    std::filesystem::create_directories(run_dir);
+
+    FileDigitSource source(digit_file.string());
+    TwoDigitBlockMapper mapper;
+    AhoCorasickCPU finder;
+    finder.load_dictionary(PI_POETRY_SOURCE_DIR "/dictionaries/english.txt");
+    finder.build();
+    HumanReviewScanner scanner(5);
+
+    Pipeline pipeline(source, mapper, finder, scanner);
+    pipeline.run(run_dir);
+    result_analyzer::analyze(run_dir);
+
+    EXPECT_TRUE(std::filesystem::exists(run_dir / "statistics.txt"));
+
+    bool found_phrase_file = false;
+    for (const auto& entry : std::filesystem::directory_iterator(run_dir)) {
+        if (entry.path().filename().string().rfind("phrases_length_", 0) == 0)
+            found_phrase_file = true;
+    }
+    EXPECT_TRUE(found_phrase_file);
+
+    std::filesystem::remove_all(run_dir);
 }

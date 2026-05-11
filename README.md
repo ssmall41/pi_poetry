@@ -84,6 +84,12 @@ The configuration file is a [TOML](https://toml.io/) document passed via `--conf
 | `max_gap` | `5` | Non-negative integer | Maximum number of unmapped characters allowed between two consecutive words for them to be grouped into the same phrase. Has no effect when `[word_finder] overlap_policy = "all-combos"`, which only produces zero-gap sequences. |
 | `threads` * | `1` | Positive integer | Worker threads for the phrase scanner. |
 
+### `[analysis]`
+
+| Field | Default | Valid Values | Description |
+|-------|---------|--------------|-------------|
+| `run_after_pipeline` | `false` | `true`, `false` | When true, automatically runs the result analyzer after the pipeline finishes. Writes per-length phrase files and `statistics.txt` into the run directory. When enabled, the timing output includes a separate `Analysis time` line in addition to `Pipeline time` and `Total time`. |
+
 \* Reserved — parsed but not yet used.
 
 ## Dictionary
@@ -149,7 +155,7 @@ In VSCode, use **Terminal > Run Task > Run: pi_download** — it will prompt for
 
 ### analyze_results
 
-Analyzes a `results.json` file produced by the main pipeline and writes two kinds of output into the same run directory:
+Analyzes a `results.json` file produced by the main pipeline. Can be run automatically after the pipeline by setting `run_after_pipeline = true` in the `[analysis]` config section, or manually as a standalone utility. Writes two kinds of output into the run directory:
 
 - **Per-length phrase files** (`phrases_length_1.txt`, `phrases_length_2.txt`, …) — one file for each distinct phrase length found in the results. Each line lists the phrase's starting character offset followed by its words: `<offset>: word1 word2 … wordN`.
 - **Statistics file** (`statistics.txt`) — phrase counts broken down by length, and the ten longest distinct words found across all phrases with their exact character offsets.

@@ -28,3 +28,6 @@ type = "human-review"
 mode = "gap-tolerant"
 max_gap = 5
 threads = 1
+
+[analysis]
+run_after_pipeline = true
