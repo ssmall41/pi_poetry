@@ -13,13 +13,13 @@ public:
 
     // Validates base() == required_base(), then runs all 4 stages serially.
     // Throws std::runtime_error on base mismatch or I/O failure.
-    void run(const std::filesystem::path& run_dir, bool write_letter_sequence = false);
+    // chunk_size: number of digits read per pass (snapped up to digits_per_char multiple).
+    void run(const std::filesystem::path& run_dir, bool write_letter_sequence = false,
+             std::size_t chunk_size = 131072);
 
 private:
     DigitSource&   source_;
     DigitMapper&   mapper_;
     WordFinder&    finder_;
     PhraseScanner& scanner_;
-
-    static constexpr std::size_t kChunkSize = 65536;
 };

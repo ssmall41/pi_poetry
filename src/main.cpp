@@ -34,6 +34,8 @@ int main(int argc, char* argv[]) {
 
         std::string digit_path = config["digit_source"]["path"].value_or(
             std::string("data/pi_2000.txt"));
+        std::size_t chunk_size = static_cast<std::size_t>(
+            config["digit_source"]["chunk_size"].value_or(int64_t{131072}));
         std::string dict_path = config["word_finder"]["dictionary"].value_or(
             std::string("dictionaries/english.txt"));
         int max_gap = config["phrase_scanner"]["max_gap"].value_or(5);
@@ -68,7 +70,7 @@ int main(int argc, char* argv[]) {
         HumanReviewScanner scanner(max_gap);
 
         Pipeline pipeline(source, mapper, finder, scanner);
-        pipeline.run(run_dir, write_letter_sequence);
+        pipeline.run(run_dir, write_letter_sequence, chunk_size);
         auto pipeline_end = std::chrono::steady_clock::now();
 
         if (run_analysis) {

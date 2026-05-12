@@ -51,21 +51,67 @@ std::vector<PhraseMatch> HumanReviewScanner::process_words(
     return result;
 }
 
+void HumanReviewScanner::process_words_streaming(
+    const std::vector<WordMatch>& batch,
+    const std::function<void(PhraseMatch)>& on_phrase) {
+
+    for (const auto& w : batch) {
+        if (!pending_phrase_) {
+            pending_phrase_.emplace();
+            pending_phrase_->start_offset = w.start;
+            pending_phrase_->words.push_back(w.word);
+            pending_end_ = w.start + w.length;
+        } else {
+            int gap = static_cast<int>(w.start) - static_cast<int>(pending_end_);
+            if (gap < 0 || gap > max_gap_) {
+                on_phrase(std::move(*pending_phrase_));
+                pending_phrase_.emplace();
+                pending_phrase_->start_offset = w.start;
+                pending_phrase_->words.push_back(w.word);
+                pending_end_ = w.start + w.length;
+            } else {
+                pending_phrase_->gap_sizes.push_back(gap);
+                pending_phrase_->words.push_back(w.word);
+                pending_end_ = w.start + w.length;
+            }
+        }
+    }
+}
+
+void HumanReviewScanner::flush_streaming(
+    const std::function<void(PhraseMatch)>& on_phrase) {
+    if (pending_phrase_) {
+        on_phrase(std::move(*pending_phrase_));
+        pending_phrase_.reset();
+        pending_end_ = 0;
+    }
+}
+
+void HumanReviewScanner::write_text_phrase(std::ostream& out, const PhraseMatch& p) {
+    out << "Offset " << p.start_offset << ": ";
+    for (std::size_t i = 0; i < p.words.size(); ++i) {
+        if (i > 0) out << ' ';
+        out << p.words[i];
+    }
+    if (!p.gap_sizes.empty()) {
+        out << " [gaps:";
+        for (int g : p.gap_sizes) out << ' ' << g;
+        out << ']';
+    }
+    out << '\n';
+}
+
+void HumanReviewScanner::write_json_phrase(std::ostream& out, const PhraseMatch& p) {
+    nlohmann::json entry;
+    entry["start_offset"] = p.start_offset;
+    entry["words"]        = p.words;
+    entry["gap_sizes"]    = p.gap_sizes;
+    out << entry.dump();
+}
+
 void HumanReviewScanner::write_text(const std::vector<PhraseMatch>& phrases,
                                     std::ostream& out) const {
-    for (const auto& p : phrases) {
-        out << "Offset " << p.start_offset << ": ";
-        for (std::size_t i = 0; i < p.words.size(); ++i) {
-            if (i > 0) out << ' ';
-            out << p.words[i];
-        }
-        if (!p.gap_sizes.empty()) {
-            out << " [gaps:";
-            for (int g : p.gap_sizes) out << ' ' << g;
-            out << ']';
-        }
-        out << '\n';
-    }
+    for (const auto& p : phrases) write_text_phrase(out, p);
 }
 
 void HumanReviewScanner::write_json(const std::vector<PhraseMatch>& phrases,

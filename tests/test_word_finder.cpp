@@ -247,6 +247,97 @@ TEST(AhoCorasickCPU, AllCombos_Swords) {
     EXPECT_TRUE(has_seq({"word"}));
 }
 
+// ── scan_chunk: stateful incremental scanning ──────────────────────────────
+
+using RawVec = std::vector<std::pair<std::size_t, std::string>>;
+
+TEST(AhoCorasickCPU, ScanChunkStateful) {
+    // Scan "catdog" as two chunks; raw output must match a single full scan.
+    AhoCorasickCPU ac;
+    ac.insert_word("cat");
+    ac.insert_word("dog");
+    ac.build();
+
+    int state = 0;
+    RawVec raw;
+    ac.scan_chunk("cat", 3, 0, state, raw);  // global_offset=0
+    ac.scan_chunk("dog", 3, 3, state, raw);  // global_offset=3
+
+    ASSERT_EQ(raw.size(), 2u);
+    EXPECT_EQ(raw[0].first, 0u);     // "cat" starts at global pos 0
+    EXPECT_EQ(raw[0].second, "cat");
+    EXPECT_EQ(raw[1].first, 3u);     // "dog" starts at global pos 3
+    EXPECT_EQ(raw[1].second, "dog");
+}
+
+TEST(AhoCorasickCPU, ScanChunkBoundaryWord) {
+    // "and" spans the chunk boundary: chunk1="xa", chunk2="ndx".
+    // State must carry over so the word is found.
+    AhoCorasickCPU ac;
+    ac.insert_word("and");
+    ac.build();
+
+    int state = 0;
+    RawVec raw;
+    ac.scan_chunk("xa", 2, 0, state, raw);   // offsets 0-1
+    ac.scan_chunk("ndx", 3, 2, state, raw);  // offsets 2-4
+
+    ASSERT_EQ(raw.size(), 1u);
+    EXPECT_EQ(raw[0].second, "and");
+    EXPECT_EQ(raw[0].first, 1u);  // "and" starts at global position 1
+}
+
+TEST(AhoCorasickCPU, ScanChunkNonLetterResetsState) {
+    // A non-letter character in a chunk must reset the AC state to root.
+    AhoCorasickCPU ac;
+    ac.insert_word("and");
+    ac.build();
+
+    int state = 0;
+    RawVec raw;
+    // 'a' advances state, then '1' (non-letter) resets to root,
+    // so "nd" in the next chunk cannot complete "and".
+    ac.scan_chunk("a1", 2, 0, state, raw);
+    ac.scan_chunk("nd", 2, 2, state, raw);
+
+    EXPECT_TRUE(raw.empty());
+}
+
+TEST(AhoCorasickCPU, AllCombosCallbackEquivalence) {
+    // apply_all_combos_cb must emit exactly the same chains as scan() with AllCombos.
+    AhoCorasickCPU ac;
+    for (auto w : {"a", "ab", "b"}) ac.insert_word(w);
+    ac.build();
+    ac.set_overlap_policy(OverlapPolicy::AllCombos);
+
+    // Collect via existing return-value scan()
+    auto seqs = ac.scan("ab", 2, 0);
+
+    // Collect via scan_chunk + apply_all_combos_cb
+    int state = 0;
+    RawVec raw;
+    ac.scan_chunk("ab", 2, 0, state, raw);
+
+    std::vector<std::vector<WordMatch>> cb_chains;
+    ac.apply_all_combos_cb(raw, 0,
+        [&](const std::vector<WordMatch>& chain) { cb_chains.push_back(chain); });
+
+    // Extract word-lists for comparison (order may differ between the two APIs)
+    auto to_word_lists = [](const std::vector<std::vector<WordMatch>>& chains) {
+        std::vector<std::vector<std::string>> result;
+        for (const auto& chain : chains) {
+            std::vector<std::string> words;
+            for (const auto& m : chain) words.push_back(m.word);
+            result.push_back(words);
+        }
+        std::sort(result.begin(), result.end());
+        return result;
+    };
+
+    ASSERT_EQ(seqs.size(), cb_chains.size());
+    EXPECT_EQ(to_word_lists(seqs), to_word_lists(cb_chains));
+}
+
 #ifdef DICT_PATH
 TEST(AhoCorasickCPU, AllCombos_AwhaleOfATale) {
     if (!std::filesystem::exists(DICT_PATH))
