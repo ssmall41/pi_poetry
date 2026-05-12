@@ -3,6 +3,7 @@ dir = "outputs"
 
 [pipeline]
 mode = "serial"
+debug = false
 
 [digit_source]
 type = "file"

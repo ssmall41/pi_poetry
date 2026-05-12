@@ -7,6 +7,7 @@
 class HumanReviewScanner final : public PhraseScanner {
 public:
     explicit HumanReviewScanner(int max_gap = 5);
+    int max_gap() const { return max_gap_; }
 
     std::vector<PhraseMatch> process_words(
         const std::vector<WordMatch>& word_stream) override;

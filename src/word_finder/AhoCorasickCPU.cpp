@@ -25,6 +25,7 @@ void AhoCorasickCPU::insert_word(const std::string& word) {
         cur = nodes_[cur].children[idx];
     }
     nodes_[cur].output_word = word;
+    if (word.size() > max_word_len_) max_word_len_ = word.size();
 }
 
 void AhoCorasickCPU::build() {
