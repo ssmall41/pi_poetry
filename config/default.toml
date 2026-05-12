@@ -8,6 +8,7 @@ mode = "serial"
 type = "file"
 path = "data/pi_1000000.txt"
 threads = 1
+chunk_size = 65
 
 [digit_mapper]
 type = "two-digit-block"

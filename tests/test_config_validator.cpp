@@ -290,6 +290,51 @@ TEST(ConfigValidator, WrongTypeForIntegerField) {
     EXPECT_TRUE(any_error_contains(errors, "digit_mapper.base"));
 }
 
+// ── digit_source.chunk_size ──────────────────────────────────────────────────
+
+TEST(ConfigValidator, ChunkSizeAbsentIsValid) {
+    auto cfg = make_valid_table();
+    cfg["digit_source"].as_table()->erase("chunk_size");
+    EXPECT_TRUE(validate_config(cfg).empty());
+}
+
+TEST(ConfigValidator, ChunkSizePositiveIsValid) {
+    auto cfg = make_valid_table();
+    cfg["digit_source"].as_table()->insert_or_assign("chunk_size", 65536);
+    EXPECT_TRUE(validate_config(cfg).empty());
+}
+
+TEST(ConfigValidator, ChunkSizeOneIsValid) {
+    auto cfg = make_valid_table();
+    cfg["digit_source"].as_table()->insert_or_assign("chunk_size", 1);
+    EXPECT_TRUE(validate_config(cfg).empty());
+}
+
+TEST(ConfigValidator, ChunkSizeZeroIsInvalid) {
+    auto cfg = make_valid_table();
+    cfg["digit_source"].as_table()->insert_or_assign("chunk_size", 0);
+    auto errors = validate_config(cfg);
+    ASSERT_EQ(errors.size(), 1u);
+    EXPECT_TRUE(any_error_contains(errors, "digit_source.chunk_size"));
+    EXPECT_TRUE(any_error_contains(errors, ">= 1"));
+}
+
+TEST(ConfigValidator, ChunkSizeNegativeIsInvalid) {
+    auto cfg = make_valid_table();
+    cfg["digit_source"].as_table()->insert_or_assign("chunk_size", -1);
+    auto errors = validate_config(cfg);
+    ASSERT_EQ(errors.size(), 1u);
+    EXPECT_TRUE(any_error_contains(errors, "digit_source.chunk_size"));
+}
+
+TEST(ConfigValidator, ChunkSizeWrongTypeIsInvalid) {
+    auto cfg = make_valid_table();
+    cfg["digit_source"].as_table()->insert_or_assign("chunk_size", "big");
+    auto errors = validate_config(cfg);
+    ASSERT_EQ(errors.size(), 1u);
+    EXPECT_TRUE(any_error_contains(errors, "digit_source.chunk_size"));
+}
+
 // ── [analysis] section ────────────────────────────────────────────────────────
 
 TEST(ConfigValidator, AnalysisSectionAbsentIsValid) {

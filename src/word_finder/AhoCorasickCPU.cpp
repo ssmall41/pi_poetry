@@ -144,26 +144,48 @@ std::vector<std::vector<WordMatch>> AhoCorasickCPU::apply_earliest_then_longest(
     return { result };
 }
 
-std::vector<std::vector<WordMatch>> AhoCorasickCPU::apply_all_combos(
-    const std::vector<std::pair<std::size_t, std::string>>& raw,
-    std::size_t global_offset) {
+void AhoCorasickCPU::scan_chunk(const char* chunk, std::size_t len,
+                                 std::size_t global_offset, int& ac_state,
+                                 std::vector<std::pair<std::size_t, std::string>>& raw_out) const {
+    assert(built_ && "build() must be called before scan_chunk()");
+    for (std::size_t i = 0; i < len; ++i) {
+        char c = chunk[i];
+        if (c < 'a' || c > 'z') {
+            ac_state = 0;
+            continue;
+        }
+        ac_state = nodes_[ac_state].children[c - 'a'];
 
-    // Build: start_pos -> [(word, end_pos)]
+        int s = ac_state;
+        while (s > 0) {
+            if (!nodes_[s].output_word.empty()) {
+                const std::string& w = nodes_[s].output_word;
+                std::size_t global_start = global_offset + i + 1 - w.size();
+                raw_out.emplace_back(global_start, w);
+            }
+            s = nodes_[s].output_link;
+            if (s <= 0) break;
+        }
+    }
+}
+
+void AhoCorasickCPU::apply_all_combos_cb(
+    const std::vector<std::pair<std::size_t, std::string>>& raw,
+    std::size_t global_offset,
+    const std::function<void(const std::vector<WordMatch>&)>& on_chain) const {
+
     std::map<std::size_t, std::vector<std::pair<std::string, std::size_t>>> by_start;
     for (const auto& [start, word] : raw)
         by_start[start].emplace_back(word, start + word.size());
-
-    std::vector<std::vector<WordMatch>> result;
 
     std::function<void(std::size_t, std::vector<WordMatch>&)> dfs =
         [&](std::size_t pos, std::vector<WordMatch>& current) {
             auto it = by_start.find(pos);
             if (it == by_start.end()) return;
             for (const auto& [word, end_pos] : it->second) {
-                WordMatch m{word, global_offset + pos, word.size(),
-                            !current.empty()};
+                WordMatch m{word, global_offset + pos, word.size(), !current.empty()};
                 current.push_back(m);
-                result.push_back(current);
+                on_chain(current);
                 dfs(end_pos, current);
                 current.pop_back();
             }
@@ -173,6 +195,20 @@ std::vector<std::vector<WordMatch>> AhoCorasickCPU::apply_all_combos(
         std::vector<WordMatch> current;
         dfs(start, current);
     }
+}
 
+std::vector<WordMatch> AhoCorasickCPU::apply_etl(
+    std::vector<std::pair<std::size_t, std::string>>& raw) {
+    auto seqs = apply_earliest_then_longest(raw, 0);
+    return seqs.empty() ? std::vector<WordMatch>{} : std::move(seqs[0]);
+}
+
+std::vector<std::vector<WordMatch>> AhoCorasickCPU::apply_all_combos(
+    const std::vector<std::pair<std::size_t, std::string>>& raw,
+    std::size_t global_offset) {
+
+    std::vector<std::vector<WordMatch>> result;
+    apply_all_combos_cb(raw, global_offset,
+        [&](const std::vector<WordMatch>& chain) { result.push_back(chain); });
     return result;
 }

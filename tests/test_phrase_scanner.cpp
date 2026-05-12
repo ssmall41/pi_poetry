@@ -147,6 +147,84 @@ TEST(HumanReviewScanner, IsolatedWordJsonOutput) {
     EXPECT_TRUE(j["phrases"][0]["gap_sizes"].empty());
 }
 
+// ── Streaming API ────────────────────────────────────────────────────────────
+
+TEST(HumanReviewScanner, StreamingEquivalence) {
+    // Feeding words in batches must produce the same phrases as a single call.
+    // Batch 1: cat+dog (form one phrase). Batch 2: far (isolated).
+    std::vector<WordMatch> all_words = {
+        make_word("cat",  0),
+        make_word("dog",  3),
+        make_word("far", 50),
+    };
+
+    HumanReviewScanner hs_stream;
+    std::vector<PhraseMatch> streamed;
+    auto on_phrase = [&](PhraseMatch p) { streamed.push_back(std::move(p)); };
+    hs_stream.process_words_streaming({all_words[0], all_words[1]}, on_phrase);
+    hs_stream.process_words_streaming({all_words[2]}, on_phrase);
+    hs_stream.flush_streaming(on_phrase);
+
+    HumanReviewScanner hs_full;
+    auto full = hs_full.process_words(all_words);
+
+    ASSERT_EQ(streamed.size(), full.size());
+    for (std::size_t i = 0; i < full.size(); ++i) {
+        EXPECT_EQ(streamed[i].start_offset, full[i].start_offset);
+        EXPECT_EQ(streamed[i].words,        full[i].words);
+        EXPECT_EQ(streamed[i].gap_sizes,    full[i].gap_sizes);
+    }
+}
+
+TEST(HumanReviewScanner, StreamingFlush) {
+    // A word sent via streaming must not be emitted until flush_streaming is called.
+    HumanReviewScanner hs;
+    std::vector<PhraseMatch> phrases;
+    auto on_phrase = [&](PhraseMatch p) { phrases.push_back(std::move(p)); };
+
+    hs.process_words_streaming({make_word("fox", 5)}, on_phrase);
+    EXPECT_TRUE(phrases.empty());  // pending, not yet flushed
+
+    hs.flush_streaming(on_phrase);
+    ASSERT_EQ(phrases.size(), 1u);
+    EXPECT_EQ(phrases[0].words,        (std::vector<std::string>{"fox"}));
+    EXPECT_EQ(phrases[0].start_offset, 5u);
+}
+
+TEST(HumanReviewScanner, StreamingFinalizesOnGapExceed) {
+    // When a new word's start exceeds last_end + max_gap, the current phrase
+    // is finalized immediately (before flush).
+    HumanReviewScanner hs;  // max_gap = 5
+    std::vector<PhraseMatch> phrases;
+    auto on_phrase = [&](PhraseMatch p) { phrases.push_back(std::move(p)); };
+
+    // cat ends at 3; dog at 9 → gap = 6 > 5 → cat finalized when dog arrives
+    hs.process_words_streaming({make_word("cat", 0), make_word("dog", 9)}, on_phrase);
+    ASSERT_EQ(phrases.size(), 1u);
+    EXPECT_EQ(phrases[0].words, (std::vector<std::string>{"cat"}));
+
+    hs.flush_streaming(on_phrase);
+    ASSERT_EQ(phrases.size(), 2u);
+    EXPECT_EQ(phrases[1].words, (std::vector<std::string>{"dog"}));
+}
+
+TEST(HumanReviewScanner, StreamingBatchBoundaryDoesNotSplitPhrase) {
+    // A phrase can span a batch boundary without being prematurely finalized.
+    HumanReviewScanner hs;
+    std::vector<PhraseMatch> phrases;
+    auto on_phrase = [&](PhraseMatch p) { phrases.push_back(std::move(p)); };
+
+    // cat+dog form one phrase (gap=0); split across two batches
+    hs.process_words_streaming({make_word("cat", 0)}, on_phrase);
+    EXPECT_TRUE(phrases.empty());
+    hs.process_words_streaming({make_word("dog", 3)}, on_phrase);
+    EXPECT_TRUE(phrases.empty());  // still pending
+    hs.flush_streaming(on_phrase);
+    ASSERT_EQ(phrases.size(), 1u);
+    EXPECT_EQ(phrases[0].words, (std::vector<std::string>{"cat", "dog"}));
+    EXPECT_EQ(phrases[0].gap_sizes, (std::vector<int>{0}));
+}
+
 TEST(HumanReviewScanner, TextOutputFormat) {
     HumanReviewScanner hs;
     // emt(3) at 97 ends at 100; ten(3) at 104 gap=4

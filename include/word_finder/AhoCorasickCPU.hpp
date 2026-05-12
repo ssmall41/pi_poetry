@@ -1,7 +1,9 @@
 #pragma once
 #include "WordFinder.hpp"
 #include <array>
+#include <functional>
 #include <string>
+#include <utility>
 #include <vector>
 
 class AhoCorasickCPU final : public WordFinder {
@@ -21,6 +23,26 @@ public:
     // Build the automaton (BFS failure links). Must be called after all
     // insert_word / load_dictionary calls and before scan().
     void build();
+
+    // Stateful incremental scan. ac_state carries the current automaton node
+    // between calls (pass 0 on the first call). Appends raw (global_start, word)
+    // pairs to raw_out; global_offset is the character position of chunk[0].
+    void scan_chunk(const char* chunk, std::size_t len,
+                    std::size_t global_offset, int& ac_state,
+                    std::vector<std::pair<std::size_t, std::string>>& raw_out) const;
+
+    // Enumerate all non-overlapping word chains in raw (global-position pairs),
+    // calling on_chain once per complete chain. Memory stays O(max_chain_depth).
+    void apply_all_combos_cb(
+        const std::vector<std::pair<std::size_t, std::string>>& raw,
+        std::size_t global_offset,
+        const std::function<void(const std::vector<WordMatch>&)>& on_chain) const;
+
+    // Apply ETL policy to global-position raw pairs. Returns the one ETL sequence.
+    std::vector<WordMatch> apply_etl(
+        std::vector<std::pair<std::size_t, std::string>>& raw);
+
+    OverlapPolicy get_overlap_policy() const { return policy_; }
 
 private:
     struct AcNode {

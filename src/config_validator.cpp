@@ -46,6 +46,15 @@ std::vector<std::string> validate_config(const toml::table& config) {
     check_reserved_str("phrase_scanner","mode",     "gap-tolerant");
 
     check_reserved_int("digit_source",  "threads", 1);
+
+    {
+        auto v = config["digit_source"]["chunk_size"].value<int64_t>();
+        if (v && *v < 1)
+            errors.push_back("digit_source.chunk_size: must be >= 1, got " +
+                             std::to_string(*v));
+        else if (!v && config["digit_source"]["chunk_size"])
+            errors.push_back("digit_source.chunk_size: must be a positive integer");
+    }
     check_reserved_int("digit_mapper",  "base",    10);
     check_reserved_int("digit_mapper",  "threads", 1);
     check_reserved_int("word_finder",   "threads", 1);

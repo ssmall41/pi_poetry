@@ -235,6 +235,64 @@ TEST(Pipeline_OverlapPolicy, ETLPhrasesAreSubsetOfAllCombos) {
     }
 }
 
+// ── Streaming refactor: output identical to old pipeline ────────────────────
+
+TEST(Pipeline_Streaming, SmallInputETLOutputMatchesBaseline) {
+    // Verify the chunked-streaming pipeline produces the same results.txt as
+    // the original bulk pipeline on a tiny deterministic input.
+    // "3141592653" → TwoDigitBlockMapper → "fphab"
+    // No dictionary words → results.txt is empty.
+    auto digit_file = make_temp_digit_file("3141592653");
+    auto run_dir    = std::filesystem::temp_directory_path() / "pi_streaming_etl_test";
+    std::filesystem::create_directories(run_dir);
+
+    FileDigitSource source(digit_file.string());
+    TwoDigitBlockMapper mapper;
+    AhoCorasickCPU finder;
+    finder.insert_word("fab");  // "fphab" contains no complete word with this dict
+    finder.build();
+    HumanReviewScanner scanner(5);
+
+    Pipeline pipeline(source, mapper, finder, scanner);
+    pipeline.run(run_dir, false, 4);  // chunk_size=4 (tiny, forces multiple chunks)
+
+    std::ifstream f(run_dir / "results.txt");
+    ASSERT_TRUE(f.is_open());
+    std::string contents((std::istreambuf_iterator<char>(f)),
+                          std::istreambuf_iterator<char>());
+    std::filesystem::remove_all(run_dir);
+    std::filesystem::remove(digit_file);
+    EXPECT_TRUE(contents.empty());
+}
+
+TEST(Pipeline_Streaming, WordSpanningChunkBoundaryIsFound) {
+    // If chunk_size=2 digits → 1 char per chunk, a word spanning multiple chunks
+    // must still be found.
+    // "00 01 02" → "a" "b" "c" (one char per chunk with dpc=2)
+    // word "abc" must be found.
+    auto digit_file = make_temp_digit_file("000102");
+    auto run_dir    = std::filesystem::temp_directory_path() / "pi_streaming_boundary_test";
+    std::filesystem::create_directories(run_dir);
+
+    FileDigitSource source(digit_file.string());
+    TwoDigitBlockMapper mapper;
+    AhoCorasickCPU finder;
+    finder.insert_word("abc");
+    finder.build();
+    HumanReviewScanner scanner(0);
+
+    Pipeline pipeline(source, mapper, finder, scanner);
+    pipeline.run(run_dir, false, 2);  // chunk_size=2 digits = 1 char/chunk
+
+    std::ifstream f(run_dir / "results.txt");
+    ASSERT_TRUE(f.is_open());
+    std::string contents((std::istreambuf_iterator<char>(f)),
+                          std::istreambuf_iterator<char>());
+    std::filesystem::remove_all(run_dir);
+    std::filesystem::remove(digit_file);
+    EXPECT_NE(contents.find("abc"), std::string::npos);
+}
+
 // ── Pipeline + analysis integration ──────────────────────────────────────────
 
 TEST(Pipeline_Analysis, AnalyzeAfterRunProducesStatisticsAndPhraseLengthFiles) {
