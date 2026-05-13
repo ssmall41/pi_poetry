@@ -1,33 +1,37 @@
 #pragma once
 #include "digit_source/DigitSource.hpp"
 #include "pipeline/WorkPackage.hpp"
-#include <mutex>
+#include <atomic>
 #include <optional>
+#include <vector>
 
-// Wraps a DigitSource and atomically assigns monotonic seq_ids to chunks.
-// Multiple threads may call next() concurrently; the mutex ensures each chunk
-// gets a unique seq_id that matches its position in the sequence.
+// Assigns monotonic seq_ids to fixed-size chunks and reads each chunk
+// (real data + lookahead) via DigitSource::read_at. Lock-free: multiple
+// threads may call next() concurrently.
 class DigitDispatcher {
 public:
-    explicit DigitDispatcher(DigitSource& source) : source_(source) {}
+    DigitDispatcher(DigitSource& source, std::size_t chunk_size, std::size_t lookahead_digits)
+        : source_(source), chunk_size_(chunk_size), lookahead_digits_(lookahead_digits) {}
 
-    std::optional<DigitPackage> next(std::size_t chunk_size) {
-        std::lock_guard<std::mutex> lock(mu_);
-        std::vector<uint8_t> buf(chunk_size);
-        std::size_t n = source_.next_chunk(buf.data(), chunk_size);
+    std::optional<DigitPackage> next() {
+        std::size_t seq_id = next_seq_.fetch_add(1, std::memory_order_relaxed);
+        std::size_t offset = seq_id * chunk_size_;
+        std::size_t read_size = chunk_size_ + lookahead_digits_;
+        std::vector<uint8_t> buf(read_size);
+        std::size_t n = source_.read_at(offset, buf.data(), read_size);
         if (n == 0) return std::nullopt;
         buf.resize(n);
         DigitPackage pkg;
-        pkg.seq_id = next_seq_++;
-        pkg.global_digit_offset = next_digit_offset_;
-        pkg.digits = std::move(buf);
-        next_digit_offset_ += n;
+        pkg.seq_id              = seq_id;
+        pkg.global_digit_offset = offset;
+        pkg.num_real_digits     = std::min(chunk_size_, n);
+        pkg.digits              = std::move(buf);
         return pkg;
     }
 
 private:
     DigitSource& source_;
-    std::mutex mu_;
-    std::size_t next_seq_{0};
-    std::size_t next_digit_offset_{0};
+    std::size_t chunk_size_;
+    std::size_t lookahead_digits_;
+    std::atomic<std::size_t> next_seq_{0};
 };

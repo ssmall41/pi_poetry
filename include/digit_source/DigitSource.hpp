@@ -2,6 +2,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <stdexcept>
 
 class DigitSource {
 public:
@@ -21,4 +22,10 @@ public:
 
     // Returns the numeric base of digits produced (10 for decimal).
     virtual int base() const = 0;
+
+    // Reads up to n digit values (0–9) starting at digit_offset into buffer.
+    // Returns actual count written. Thread-safe; does not advance stream position.
+    virtual std::size_t read_at(std::size_t /*digit_offset*/, uint8_t* /*buffer*/, std::size_t /*n*/) {
+        throw std::runtime_error("read_at not supported by this DigitSource");
+    }
 };

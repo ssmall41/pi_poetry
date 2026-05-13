@@ -149,9 +149,10 @@ public:
         chars.resize(n_chars);
 
         LetterPackage out;
-        out.seq_id = pkg.seq_id;
+        out.seq_id             = pkg.seq_id;
         out.global_char_offset = pkg.global_digit_offset / static_cast<std::size_t>(dpc_);
-        out.chars = std::move(chars);
+        out.num_real_chars     = pkg.num_real_digits / static_cast<std::size_t>(dpc_);
+        out.chars              = std::move(chars);
         return out;
     }
 
@@ -160,26 +161,28 @@ private:
     int dpc_;
 };
 
-class WordFinderWorker final : public StageWorker<WFInput, WordPackage> {
+class WordFinderWorker final : public StageWorker<LetterPackage, WordPackage> {
 public:
     explicit WordFinderWorker(AhoCorasickCPU& ac) : ac_(ac) {}
     std::string stage_name() const override { return "word_finder"; }
 
-    WordPackage process(WFInput pkg) override {
+    WordPackage process(LetterPackage pkg) override {
         int state = 0;
         std::vector<std::pair<std::size_t, std::string>> raw;
-        ac_.scan_chunk(pkg.chars.data(), pkg.chars.size(), pkg.real_char_start,
+        std::size_t real_char_start = pkg.global_char_offset;
+        std::size_t real_char_end   = pkg.global_char_offset + pkg.num_real_chars;
+        ac_.scan_chunk(pkg.chars.data(), pkg.chars.size(), real_char_start,
                        state, raw);
 
         // Discard matches that start in the lookahead buffer zone.
         raw.erase(std::remove_if(raw.begin(), raw.end(),
-                      [&](const auto& p) { return p.first >= pkg.real_char_end; }),
+                      [&](const auto& p) { return p.first >= real_char_end; }),
                   raw.end());
 
         WordPackage out;
-        out.seq_id = pkg.seq_id;
-        out.real_char_start = pkg.real_char_start;
-        out.real_char_end   = pkg.real_char_end;
+        out.seq_id          = pkg.seq_id;
+        out.real_char_start = real_char_start;
+        out.real_char_end   = real_char_end;
         out.raw_matches     = std::move(raw);
         return out;
     }
@@ -214,51 +217,6 @@ public:
 private:
     HumanReviewScanner& scanner_;
 };
-
-// ── WFCoordinator: assembles letter packages with lookahead buffer ─────────────
-
-void wf_coordinator(BoundedQueue<LetterPackage>& letter_q,
-                    BoundedQueue<WFInput>& wf_in_q,
-                    std::size_t max_word_len) {
-    std::map<std::size_t, LetterPackage> pending;
-    std::size_t next_emit = 0;
-    // Buffer = max_word_len - 1 chars from the next chunk allows the AC scan
-    // to complete words that start in the real range but extend into the next chunk.
-    const std::size_t buf_chars = (max_word_len > 0) ? max_word_len - 1 : 0;
-
-    auto emit = [&](std::size_t id, const LetterPackage* next_pkg) {
-        auto& cur = pending.at(id);
-        WFInput inp;
-        inp.seq_id          = cur.seq_id;
-        inp.real_char_start = cur.global_char_offset;
-        inp.real_char_end   = cur.global_char_offset + cur.chars.size();
-        inp.chars           = cur.chars;
-        if (next_pkg && buf_chars > 0) {
-            std::size_t take = std::min(buf_chars, next_pkg->chars.size());
-            inp.chars.insert(inp.chars.end(),
-                             next_pkg->chars.begin(),
-                             next_pkg->chars.begin() + static_cast<std::ptrdiff_t>(take));
-        }
-        wf_in_q.push(std::move(inp));
-        pending.erase(id);
-    };
-
-    LetterPackage pkg;
-    while (letter_q.pop(pkg)) {
-        pending[pkg.seq_id] = std::move(pkg);
-        // Emit chunk N when both N and N+1 are present (N+1 provides the buffer).
-        while (pending.count(next_emit) && pending.count(next_emit + 1)) {
-            emit(next_emit, &pending.at(next_emit + 1));
-            ++next_emit;
-        }
-    }
-    // Flush the last chunk (no next chunk → no buffer).
-    while (pending.count(next_emit)) {
-        emit(next_emit, nullptr);
-        ++next_emit;
-    }
-    wf_in_q.set_done();
-}
 
 // ── PhraseCoordinator: applies overlap policy and assembles phrase packages ───
 
@@ -407,20 +365,22 @@ void Pipeline::run_parallel(const std::filesystem::path& run_dir,
     const std::size_t Q = cfg.queue_capacity;
     BoundedQueue<DigitPackage>  digit_q(Q);
     BoundedQueue<LetterPackage> letter_q(Q);
-    BoundedQueue<WFInput>       wf_in_q(Q);
     BoundedQueue<WordPackage>   word_q(Q);
     BoundedQueue<ComboPackage>  combo_q(Q);
     BoundedQueue<PhrasePackage> phrase_q(Q);
 
     // ── Stage 1: digit feeders ────────────────────────────────────────────────
-    DigitDispatcher dispatcher(source_);
+    const std::size_t max_word_len = ac->max_word_length();
+    const std::size_t lookahead_digits =
+        (max_word_len > 0 ? max_word_len - 1 : 0) * static_cast<std::size_t>(dpc);
+    DigitDispatcher dispatcher(source_, chunk_size, lookahead_digits);
     std::atomic<int> active_feeders{cfg.digit_threads};
     std::mutex cout_mu;
     std::vector<std::thread> feeder_threads;
 
     for (int t = 0; t < cfg.digit_threads; ++t) {
         feeder_threads.emplace_back([&, t] {
-            while (auto pkg = dispatcher.next(chunk_size)) {
+            while (auto pkg = dispatcher.next()) {
                 if (cfg.debug) {
                     auto remaining = digit_q.size();
                     std::lock_guard<std::mutex> lk(cout_mu);
@@ -443,18 +403,12 @@ void Pipeline::run_parallel(const std::filesystem::path& run_dir,
         std::move(mapper_workers), digit_q, letter_q, cfg.debug);
     mapper_runner.start();
 
-    // ── WFCoordinator: letter_q → wf_in_q (assembles lookahead buffer) ───────
-    std::size_t max_word_len = ac->max_word_length();
-    std::thread wf_coord_thread([&] {
-        wf_coordinator(letter_q, wf_in_q, max_word_len);
-    });
-
     // ── Stage 3: word_finder workers ─────────────────────────────────────────
-    std::vector<std::unique_ptr<StageWorker<WFInput, WordPackage>>> finder_workers;
+    std::vector<std::unique_ptr<StageWorker<LetterPackage, WordPackage>>> finder_workers;
     for (int i = 0; i < cfg.finder_threads; ++i)
         finder_workers.push_back(std::make_unique<WordFinderWorker>(*ac));
-    StageRunner<WFInput, WordPackage> finder_runner(
-        std::move(finder_workers), wf_in_q, word_q, cfg.debug);
+    StageRunner<LetterPackage, WordPackage> finder_runner(
+        std::move(finder_workers), letter_q, word_q, cfg.debug);
     finder_runner.start();
 
     // ── PhraseCoordinator: word_q → combo_q ──────────────────────────────────
@@ -513,7 +467,6 @@ void Pipeline::run_parallel(const std::filesystem::path& run_dir,
     // ── Join all threads ──────────────────────────────────────────────────────
     for (auto& t : feeder_threads) t.join();
     mapper_runner.join();
-    wf_coord_thread.join();
     finder_runner.join();
     phrase_coord_thread.join();
     scanner_runner.join();

@@ -3,13 +3,13 @@ dir = "outputs"
 
 [pipeline]
 mode = "serial"
-debug = false
+debug = true
 
 [digit_source]
 type = "file"
-path = "data/pi_1000000.txt"
-threads = 1
-chunk_size = 128
+path = "data/pi_10000000.txt"
+threads = 2
+chunk_size = 32768
 
 [digit_mapper]
 type = "two-digit-block"
@@ -32,4 +32,4 @@ max_gap = 5
 threads = 1
 
 [analysis]
-run_after_pipeline = true
+run_after_pipeline = false

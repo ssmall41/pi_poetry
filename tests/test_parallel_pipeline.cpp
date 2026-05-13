@@ -101,7 +101,7 @@ TEST(ParallelPipeline, WordFoundAcrossChunkBoundary) {
     Pipeline::ParallelConfig cfg;
     // chunk_size=4 digits = 2 chars per chunk. Word "abc" (len 3) spans chunk 0
     // ("ab") into chunk 1 ("c"). The WF lookahead buffer appends up to
-    // max_word_len-1=2 chars from chunk 1 to chunk 0's WFInput, giving "abc".
+    // max_word_len-1=2 lookahead chars appended to chunk 0's read, giving "abc".
     cfg.chunk_size      = 4;
     cfg.digit_threads   = 1;
     cfg.mapper_threads  = 1;

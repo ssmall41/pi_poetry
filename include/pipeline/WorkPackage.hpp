@@ -9,22 +9,15 @@
 struct DigitPackage {
     std::size_t seq_id{0};
     std::size_t global_digit_offset{0};
+    std::size_t num_real_digits{0};
     std::vector<uint8_t> digits;
 };
 
 struct LetterPackage {
     std::size_t seq_id{0};
     std::size_t global_char_offset{0};
-    std::vector<char> chars;
-};
-
-// Input to a WordFinder worker: real chars + lookahead buffer from the next chunk.
-// Words that start in [real_char_start, real_char_end) are kept; others discarded.
-struct WFInput {
-    std::size_t seq_id{0};
-    std::size_t real_char_start{0};
-    std::size_t real_char_end{0};
-    std::vector<char> chars;   // real + buffer
+    std::size_t num_real_chars{0};
+    std::vector<char> chars;   // real chars + lookahead buffer
 };
 
 struct WordPackage {
