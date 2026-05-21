@@ -3,33 +3,43 @@
 #include <functional>
 #include <map>
 
-// Collects items indexed by a monotonically-assigned seq_id and emits them
-// in strict ascending order via a callback.
-// submit() + drain() can be called concurrently on different items, but the
-// caller is responsible for external synchronization if multiple threads call
-// these methods on the same instance.
+// Two-level reorder buffer keyed by (chunk_id, intra_chunk_seq_id).
+// A chunk is ready to drain when its final package has arrived
+// (is_final=true marks the last intra index K) and all 0..K packages
+// for that chunk are present.  Chunks drain in chunk_id order.
 template<typename T>
 class ReorderBuffer {
 public:
-    void submit(std::size_t seq_id, T item) {
-        pending_[seq_id] = std::move(item);
+    void submit(std::size_t chunk_id, std::size_t intra_id, bool is_final, T item) {
+        pending_[chunk_id][intra_id] = std::move(item);
+        if (is_final)
+            final_idx_[chunk_id] = intra_id;
     }
 
-    // Flush all consecutively-ready items starting from next_emit_.
     void drain(const std::function<void(T&)>& cb) {
-        while (pending_.count(next_emit_)) {
-            cb(pending_.at(next_emit_));
-            pending_.erase(next_emit_);
-            ++next_emit_;
+        while (true) {
+            auto fit = final_idx_.find(next_chunk_);
+            if (fit == final_idx_.end()) break;          // no final yet for this chunk
+
+            std::size_t K   = fit->second;
+            auto& inner     = pending_[next_chunk_];
+            if (inner.size() != K + 1) break;            // not all intra packages arrived yet
+
+            for (std::size_t i = 0; i <= K; ++i)
+                cb(inner.at(i));
+
+            pending_.erase(next_chunk_);
+            final_idx_.erase(next_chunk_);
+            ++next_chunk_;
         }
     }
 
-    // Flush everything remaining (call once after all items submitted).
     void drain_all(const std::function<void(T&)>& cb) {
         drain(cb);
     }
 
 private:
-    std::map<std::size_t, T> pending_;
-    std::size_t next_emit_{0};
+    std::map<std::size_t, std::map<std::size_t, T>> pending_;
+    std::map<std::size_t, std::size_t>               final_idx_;
+    std::size_t next_chunk_{0};
 };

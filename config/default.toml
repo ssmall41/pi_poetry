@@ -3,7 +3,7 @@ dir = "outputs"
 
 [pipeline]
 mode = "serial"
-debug = true
+debug = false
 
 [digit_source]
 type = "file"
@@ -32,4 +32,4 @@ max_gap = 5
 threads = 1
 
 [analysis]
-run_after_pipeline = false
+run_after_pipeline = true

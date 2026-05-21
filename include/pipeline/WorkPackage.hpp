@@ -20,25 +20,20 @@ struct LetterPackage {
     std::vector<char> chars;   // real chars + lookahead buffer
 };
 
-struct WordPackage {
-    std::size_t seq_id{0};
-    std::size_t real_char_start{0};
-    std::size_t real_char_end{0};
-    // (global_offset, word) pairs; all start within [real_char_start, real_char_end)
-    std::vector<std::pair<std::size_t, std::string>> raw_matches;
-};
-
 // One overlap-policy chain (from ETL or AllCombos) ready for phrase scanning.
-// chain may include buffer words from the next chunk (start >= chunk_real_char_end).
-// PhraseScannerWorker discards phrases whose first word starts >= chunk_real_char_end.
-// seq_id is globally monotonic across all combo packages, used by ReorderBuffer.
+// chunk_id matches the LetterPackage seq_id this chain came from.
+// intra_chunk_seq_id is 0-based within the chunk; final_package_in_chunk marks
+// the last package for that chunk so ReorderBuffer can drain in order.
 struct ComboPackage {
-    std::size_t seq_id{0};
-    std::size_t chunk_real_char_end{0};
+    std::size_t chunk_id{0};
+    std::size_t intra_chunk_seq_id{0};
+    bool        final_package_in_chunk{false};
     std::vector<WordMatch> chain;
 };
 
 struct PhrasePackage {
-    std::size_t seq_id{0};
+    std::size_t chunk_id{0};
+    std::size_t intra_chunk_seq_id{0};
+    bool        final_package_in_chunk{false};
     std::vector<PhraseMatch> phrases;
 };

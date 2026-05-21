@@ -44,16 +44,20 @@ private:
                           << " claimed package " << pkg_seq_id(pkg)
                           << " (" << remaining << " remaining)\n";
             }
-            auto result = workers_[worker_id]->process(std::move(pkg));
-            out_q_.push(std::move(result));
+            workers_[worker_id]->process(std::move(pkg),
+                [&](Out result) { out_q_.push(std::move(result)); });
         }
         if (active_.fetch_sub(1) == 1)
             out_q_.set_done();
     }
 
-    // Extract seq_id from any package type (all have seq_id as first field).
     template<typename P>
-    static std::size_t pkg_seq_id(const P& p) { return p.seq_id; }
+    static std::size_t pkg_seq_id(const P& p) {
+        if constexpr (requires { p.chunk_id; })
+            return p.chunk_id;
+        else
+            return p.seq_id;
+    }
 
     std::vector<std::unique_ptr<StageWorker<In, Out>>> workers_;
     BoundedQueue<In>& in_q_;

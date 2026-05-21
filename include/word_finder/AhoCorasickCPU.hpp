@@ -58,7 +58,6 @@ private:
     OverlapPolicy policy_{OverlapPolicy::EarliestThenLongest};
     std::size_t min_word_length_{1};
     std::size_t max_word_len_{0};
-    std::size_t prev_match_end_{0};
     bool built_{false};
 
     std::vector<std::vector<WordMatch>> apply_earliest_then_longest(
