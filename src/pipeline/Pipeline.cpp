@@ -162,7 +162,7 @@ private:
 
 class WordFinderWorker final : public StageWorker<LetterPackage, ComboPackage> {
 public:
-    WordFinderWorker(AhoCorasickCPU& ac, int max_gap) : ac_(ac), max_gap_(max_gap) {}
+    explicit WordFinderWorker(AhoCorasickCPU& ac) : ac_(ac) {}
     std::string stage_name() const override { return "word_finder"; }
 
     void process(LetterPackage pkg, const std::function<void(ComboPackage)>& emit) override {
@@ -172,17 +172,16 @@ public:
         const std::size_t real_char_end   = pkg.global_char_offset + pkg.num_real_chars;
         ac_.scan_chunk(pkg.chars.data(), pkg.chars.size(), real_char_start, state, raw);
 
+        // Exclude words that START in the lookahead zone — those belong to the
+        // next chunk.  Words that start in the real zone but end in the lookahead
+        // (boundary-straddling) are kept: the lookahead exists precisely for them.
+        raw.erase(std::remove_if(raw.begin(), raw.end(),
+                      [&](const auto& p) { return p.first >= real_char_end; }),
+                  raw.end());
+
         const std::size_t chunk_id = pkg.seq_id;
 
         if (ac_.get_overlap_policy() == OverlapPolicy::AllCombos) {
-            // Exclude boundary-spanning words. AllCombos chains from the
-            // remainder are always a subset of serial AllCombos chains.
-            raw.erase(std::remove_if(raw.begin(), raw.end(),
-                          [&](const auto& p) {
-                              return p.first + p.second.size() > real_char_end;
-                          }),
-                      raw.end());
-
             std::vector<ComboPackage> pending;
             std::size_t intra = 0;
             ac_.apply_all_combos_cb(raw, 0, [&](const std::vector<WordMatch>& chain) {
@@ -204,51 +203,17 @@ public:
                 for (auto& cp : pending) emit(std::move(cp));
             }
         } else {
-            // ETL: run a speculative greedy scan over all raw matches
-            // (including boundary-spanning ones) to keep scan_pos consistent
-            // with serial ETL. Boundary-spanning words and any words within
-            // max_gap of their end are excluded from the emitted chain,
-            // preventing partial phrases absent from serial output.
-            std::sort(raw.begin(), raw.end(), [](const auto& a, const auto& b) {
-                if (a.first != b.first) return a.first < b.first;
-                return a.second.size() > b.second.size();
-            });
-
-            std::vector<WordMatch> chain;
-            std::size_t scan_pos = 0;
-            std::size_t dead_end = 0;
-            std::size_t prev_end = 0;
-
-            for (auto& [start, word] : raw) {
-                if (start < scan_pos) continue;
-                const std::size_t end = start + word.size();
-                scan_pos = end;
-
-                if (start < dead_end) continue;
-
-                if (end > real_char_end) {
-                    // Suppress words within max_gap of this boundary word's end.
-                    dead_end = end + static_cast<std::size_t>(max_gap_) + 1;
-                    continue;
-                }
-
-                const bool consecutive = !chain.empty() && (start == prev_end);
-                chain.push_back({word, start, word.size(), consecutive});
-                prev_end = end;
-            }
-
             ComboPackage cp;
             cp.chunk_id               = chunk_id;
             cp.intra_chunk_seq_id     = 0;
             cp.final_package_in_chunk = true;
-            cp.chain                  = std::move(chain);
+            cp.chain                  = ac_.apply_etl(raw);
             emit(std::move(cp));
         }
     }
 
 private:
     AhoCorasickCPU& ac_;
-    int max_gap_;
 };
 
 class PhraseScannerWorker final : public StageWorker<ComboPackage, PhrasePackage> {
@@ -334,10 +299,9 @@ void Pipeline::run_parallel(const std::filesystem::path& run_dir,
     mapper_runner.start();
 
     // ── Stage 3: word_finder workers (scan + apply overlap policy) ───────────
-    const int max_gap = hs->max_gap();
     std::vector<std::unique_ptr<StageWorker<LetterPackage, ComboPackage>>> finder_workers;
     for (int i = 0; i < cfg.finder_threads; ++i)
-        finder_workers.push_back(std::make_unique<WordFinderWorker>(*ac, max_gap));
+        finder_workers.push_back(std::make_unique<WordFinderWorker>(*ac));
     StageRunner<LetterPackage, ComboPackage> finder_runner(
         std::move(finder_workers), letter_q, combo_q, cfg.debug);
     finder_runner.start();

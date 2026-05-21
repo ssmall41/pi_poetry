@@ -7,8 +7,8 @@ debug = false
 
 [digit_source]
 type = "file"
-path = "data/pi_10000000.txt"
-threads = 2
+path = "data/pi_1000000.txt"
+threads = 1
 chunk_size = 32768
 
 [digit_mapper]
