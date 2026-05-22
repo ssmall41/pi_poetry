@@ -44,17 +44,19 @@ int main(int argc, char* argv[]) {
         std::string out_dir = config["output"]["dir"].value_or(std::string("outputs"));
         bool write_letter_sequence = config["digit_mapper"]["write_letter_sequence"].value_or(false);
         bool run_analysis = config["analysis"]["run_after_pipeline"].value_or(false);
+        bool dry_run      = config["pipeline"]["dry_run"].value_or(false);
 
         auto now = std::chrono::system_clock::now();
         std::time_t t = std::chrono::system_clock::to_time_t(now);
         std::tm* tm_ptr = std::localtime(&t);
         char buf[20];
         std::strftime(buf, sizeof(buf), "%Y%m%d_%H%M%S", tm_ptr);
-        std::filesystem::path run_dir =
-            std::filesystem::path(out_dir) / ("run-" + std::string(buf));
-        std::filesystem::create_directories(run_dir);
-
-        std::cout << "Run output: " << run_dir.string() << "\n";
+        std::filesystem::path run_dir;
+        if (!dry_run) {
+            run_dir = std::filesystem::path(out_dir) / ("run-" + std::string(buf));
+            std::filesystem::create_directories(run_dir);
+            std::cout << "Run output: " << run_dir.string() << "\n";
+        }
 
         std::string policy_str = config["word_finder"]["overlap_policy"].value_or(
             std::string("earliest-then-longest"));
@@ -64,7 +66,6 @@ int main(int argc, char* argv[]) {
         int finder_threads  = config["word_finder"]["threads"].value_or(1);
         int scanner_threads = config["phrase_scanner"]["threads"].value_or(1);
         bool debug          = config["pipeline"]["debug"].value_or(false);
-        bool dry_run        = config["pipeline"]["dry_run"].value_or(false);
 
         FileDigitSource source(digit_path);
         TwoDigitBlockMapper mapper;
@@ -89,7 +90,7 @@ int main(int argc, char* argv[]) {
         pipeline.run_parallel(run_dir, pcfg);
         auto pipeline_end = std::chrono::steady_clock::now();
 
-        if (run_analysis) {
+        if (run_analysis && !dry_run) {
             result_analyzer::analyze(run_dir);
             auto total_end  = std::chrono::steady_clock::now();
             auto pipeline_s = std::chrono::duration<double>(pipeline_end - start).count();
