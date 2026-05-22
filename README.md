@@ -47,6 +47,7 @@ The configuration file is a [TOML](https://toml.io/) document passed via `--conf
 |-------|---------|--------------|-------------|
 | `mode` | `"serial"` | `"serial"`, `"parallel"` | Execution mode. `"serial"` runs all stages on one thread. `"parallel"` runs each stage with a pool of worker threads connected by bounded queues; the number of workers per stage is set by the `threads` field in each stage's section. |
 | `debug` | `false` | `true`, `false` | When true, prints a `[stage] worker N claimed package M (K remaining)` message to stdout each time a worker picks up a work package. Useful for observing parallelism; leave false for clean output in production runs. |
+| `dry_run` | `false` | `true`, `false` | When true, output is written to `/dev/null` instead of the run directory. Use this to benchmark pipeline throughput without I/O overhead. |
 
 ### `[digit_source]`
 
