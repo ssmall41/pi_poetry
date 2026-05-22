@@ -12,6 +12,7 @@
 #include <fstream>
 #include <iostream>
 #include <mutex>
+#include <sstream>
 #include <nlohmann/json.hpp>
 #include <stdexcept>
 #include <thread>
@@ -226,7 +227,16 @@ public:
         out.chunk_id               = pkg.chunk_id;
         out.intra_chunk_seq_id     = pkg.intra_chunk_seq_id;
         out.final_package_in_chunk = pkg.final_package_in_chunk;
-        out.phrases                = scanner_.process_words(pkg.chain);
+        auto phrases = scanner_.process_words(pkg.chain);
+        out.text_strs.reserve(phrases.size());
+        out.json_strs.reserve(phrases.size());
+        for (const auto& p : phrases) {
+            std::ostringstream t, j;
+            HumanReviewScanner::write_text_phrase(t, p);
+            HumanReviewScanner::write_json_phrase(j, p);
+            out.text_strs.push_back(t.str());
+            out.json_strs.push_back(j.str());
+        }
         emit(std::move(out));
     }
 
@@ -258,11 +268,10 @@ void Pipeline::run_parallel(const std::filesystem::path& run_dir,
 
     source_.reset();
 
-    const std::size_t Q = cfg.queue_capacity;
-    BoundedQueue<DigitPackage>  digit_q(Q);
-    BoundedQueue<LetterPackage> letter_q(Q);
-    BoundedQueue<ComboPackage>  combo_q(Q);
-    BoundedQueue<PhrasePackage> phrase_q(Q);
+    BoundedQueue<DigitPackage>  digit_q(cfg.digit_q_capacity);
+    BoundedQueue<LetterPackage> letter_q(cfg.letter_q_capacity);
+    BoundedQueue<ComboPackage>  combo_q(cfg.combo_q_capacity);
+    BoundedQueue<PhrasePackage> phrase_q(cfg.phrase_q_capacity);
 
     // ── Stage 1: digit feeders ────────────────────────────────────────────────
     const std::size_t max_word_len = ac->max_word_length();
@@ -334,21 +343,19 @@ void Pipeline::run_parallel(const std::filesystem::path& run_dir,
             reorder.submit(pp.chunk_id, pp.intra_chunk_seq_id,
                            pp.final_package_in_chunk, std::move(pp));
             reorder.drain([&](PhrasePackage& p) {
-                for (auto& phrase : p.phrases) {
-                    HumanReviewScanner::write_text_phrase(txt_out, phrase);
+                for (std::size_t i = 0; i < p.text_strs.size(); ++i) {
+                    txt_out << p.text_strs[i];
                     if (!first_json) json_out << ',';
-                    json_out << '\n';
-                    HumanReviewScanner::write_json_phrase(json_out, phrase);
+                    json_out << '\n' << p.json_strs[i];
                     first_json = false;
                 }
             });
         }
         reorder.drain_all([&](PhrasePackage& p) {
-            for (auto& phrase : p.phrases) {
-                HumanReviewScanner::write_text_phrase(txt_out, phrase);
+            for (std::size_t i = 0; i < p.text_strs.size(); ++i) {
+                txt_out << p.text_strs[i];
                 if (!first_json) json_out << ',';
-                json_out << '\n';
-                HumanReviewScanner::write_json_phrase(json_out, phrase);
+                json_out << '\n' << p.json_strs[i];
                 first_json = false;
             }
         });

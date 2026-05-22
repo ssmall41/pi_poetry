@@ -2,12 +2,16 @@
 dir = "outputs"
 
 [pipeline]
-mode = "serial"
+mode = "parallel"
+debug = false
+dry_run = false
 
 [digit_source]
 type = "file"
-path = "data/whale.txt"
+path = "data/pi_100000000.txt"
 threads = 1
+chunk_size = 32768
+queue_size = 16
 
 [digit_mapper]
 type = "two-digit-block"
@@ -15,16 +19,22 @@ alphabet = "alpha-lower"
 base = 10
 threads = 1
 write_letter_sequence = true
+queue_size = 16
 
 [word_finder]
 type = "aho-corasick-cpu"
-dictionary = "dictionaries/english.txt"
-overlap_policy = "earliest-then-longest"
+dictionary = "dictionaries/google-10000-english-trimmed.txt"
+overlap_policy = "all-combos"
 min_word_length = 3
-threads = 1
+threads = 2
+queue_size = 1000000
 
 [phrase_scanner]
 type = "human-review"
 mode = "gap-tolerant"
 max_gap = 5
-threads = 1
+threads = 2
+queue_size = 16
+
+[analysis]
+run_after_pipeline = false

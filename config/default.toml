@@ -11,6 +11,7 @@ type = "file"
 path = "data/pi_1000000.txt"
 threads = 1
 chunk_size = 32768
+queue_size = 16
 
 [digit_mapper]
 type = "two-digit-block"
@@ -18,6 +19,7 @@ alphabet = "alpha-lower"
 base = 10
 threads = 1
 write_letter_sequence = true
+queue_size = 16
 
 [word_finder]
 type = "aho-corasick-cpu"
@@ -25,12 +27,14 @@ dictionary = "dictionaries/google-10000-english-trimmed.txt"
 overlap_policy = "all-combos"
 min_word_length = 1
 threads = 1
+queue_size = 16
 
 [phrase_scanner]
 type = "human-review"
 mode = "gap-tolerant"
 max_gap = 5
 threads = 1
+queue_size = 16
 
 [analysis]
 run_after_pipeline = true
