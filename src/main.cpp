@@ -52,7 +52,9 @@ int main(int argc, char* argv[]) {
         char buf[20];
         std::strftime(buf, sizeof(buf), "%Y%m%d_%H%M%S", tm_ptr);
         std::filesystem::path run_dir;
-        if (!dry_run) {
+        if (dry_run) {
+            std::cout << "Dry run: no output will be written.\n";
+        } else {
             run_dir = std::filesystem::path(out_dir) / ("run-" + std::string(buf));
             std::filesystem::create_directories(run_dir);
             std::cout << "Run output: " << run_dir.string() << "\n";
