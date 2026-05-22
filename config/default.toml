@@ -2,8 +2,9 @@
 dir = "outputs"
 
 [pipeline]
-mode = "serial"
+mode = "parallel"
 debug = false
+dry_run = false
 
 [digit_source]
 type = "file"
