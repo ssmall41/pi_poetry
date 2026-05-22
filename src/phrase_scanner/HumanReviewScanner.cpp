@@ -102,11 +102,17 @@ void HumanReviewScanner::write_text_phrase(std::ostream& out, const PhraseMatch&
 }
 
 void HumanReviewScanner::write_json_phrase(std::ostream& out, const PhraseMatch& p) {
-    nlohmann::json entry;
-    entry["start_offset"] = p.start_offset;
-    entry["words"]        = p.words;
-    entry["gap_sizes"]    = p.gap_sizes;
-    out << entry.dump();
+    out << "{\"start_offset\":" << p.start_offset << ",\"words\":[";
+    for (std::size_t i = 0; i < p.words.size(); ++i) {
+        if (i > 0) out << ',';
+        out << '"' << p.words[i] << '"';
+    }
+    out << "],\"gap_sizes\":[";
+    for (std::size_t i = 0; i < p.gap_sizes.size(); ++i) {
+        if (i > 0) out << ',';
+        out << p.gap_sizes[i];
+    }
+    out << "]}";
 }
 
 void HumanReviewScanner::write_text(const std::vector<PhraseMatch>& phrases,

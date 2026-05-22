@@ -25,9 +25,12 @@ public:
         int         mapper_threads   = 1;
         int         finder_threads   = 1;
         int         scanner_threads  = 1;
-        // Bounded-queue capacity per stage pair. push() blocks when full,
-        // providing back-pressure from slow downstream stages.
-        std::size_t queue_capacity   = 16;
+        // Per-queue bounded capacity (listed under the stage that produces into it).
+        // push() blocks when full, providing back-pressure from slow downstream stages.
+        std::size_t digit_q_capacity   = 16;   // digit_source  → digit_mapper
+        std::size_t letter_q_capacity  = 16;   // digit_mapper  → word_finder
+        std::size_t combo_q_capacity   = 16;   // word_finder   → phrase_scanner
+        std::size_t phrase_q_capacity  = 16;   // phrase_scanner → writer
         bool        debug            = false;
         bool        dry_run          = false;
     };

@@ -35,5 +35,6 @@ struct PhrasePackage {
     std::size_t chunk_id{0};
     std::size_t intra_chunk_seq_id{0};
     bool        final_package_in_chunk{false};
-    std::vector<PhraseMatch> phrases;
+    std::vector<std::string> text_strs;  // one line per phrase, newline included
+    std::vector<std::string> json_strs;  // one JSON object per phrase, no comma/newline
 };

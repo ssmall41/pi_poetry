@@ -37,12 +37,14 @@ private:
         In pkg;
         while (in_q_.pop(pkg)) {
             if (debug_) {
-                auto remaining = in_q_.size();
+                auto in_remaining = in_q_.size();
+                auto out_pending  = out_q_.size();
                 std::lock_guard<std::mutex> lock(cout_mu_);
                 std::cout << "[" << workers_[worker_id]->stage_name()
                           << "] worker " << worker_id
                           << " claimed package " << pkg_seq_id(pkg)
-                          << " (" << remaining << " remaining)\n";
+                          << " (in: " << in_remaining << " remaining"
+                          << ", out: " << out_pending << " pending)\n";
             }
             workers_[worker_id]->process(std::move(pkg),
                 [&](Out result) { out_q_.push(std::move(result)); });

@@ -68,6 +68,10 @@ int main(int argc, char* argv[]) {
         int finder_threads  = config["word_finder"]["threads"].value_or(1);
         int scanner_threads = config["phrase_scanner"]["threads"].value_or(1);
         bool debug          = config["pipeline"]["debug"].value_or(false);
+        std::size_t digit_q_capacity  = config["digit_source"]["queue_size"].value_or(16);
+        std::size_t letter_q_capacity = config["digit_mapper"]["queue_size"].value_or(16);
+        std::size_t combo_q_capacity  = config["word_finder"]["queue_size"].value_or(16);
+        std::size_t phrase_q_capacity = config["phrase_scanner"]["queue_size"].value_or(16);
 
         FileDigitSource source(digit_path);
         TwoDigitBlockMapper mapper;
@@ -87,8 +91,12 @@ int main(int argc, char* argv[]) {
         pcfg.mapper_threads  = mapper_threads;
         pcfg.finder_threads  = finder_threads;
         pcfg.scanner_threads = scanner_threads;
-        pcfg.debug           = debug;
-        pcfg.dry_run         = dry_run;
+        pcfg.debug            = debug;
+        pcfg.dry_run          = dry_run;
+        pcfg.digit_q_capacity  = digit_q_capacity;
+        pcfg.letter_q_capacity = letter_q_capacity;
+        pcfg.combo_q_capacity  = combo_q_capacity;
+        pcfg.phrase_q_capacity = phrase_q_capacity;
         pipeline.run_parallel(run_dir, pcfg);
         auto pipeline_end = std::chrono::steady_clock::now();
 
