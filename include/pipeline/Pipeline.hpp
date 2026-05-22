@@ -29,6 +29,7 @@ public:
         // providing back-pressure from slow downstream stages.
         std::size_t queue_capacity   = 16;
         bool        debug            = false;
+        bool        dry_run          = false;
     };
 
     // Parallel version: each stage runs with cfg.*_threads worker threads.

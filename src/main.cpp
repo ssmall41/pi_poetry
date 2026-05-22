@@ -64,6 +64,7 @@ int main(int argc, char* argv[]) {
         int finder_threads  = config["word_finder"]["threads"].value_or(1);
         int scanner_threads = config["phrase_scanner"]["threads"].value_or(1);
         bool debug          = config["pipeline"]["debug"].value_or(false);
+        bool dry_run        = config["pipeline"]["dry_run"].value_or(false);
 
         FileDigitSource source(digit_path);
         TwoDigitBlockMapper mapper;
@@ -84,6 +85,7 @@ int main(int argc, char* argv[]) {
         pcfg.finder_threads  = finder_threads;
         pcfg.scanner_threads = scanner_threads;
         pcfg.debug           = debug;
+        pcfg.dry_run         = dry_run;
         pipeline.run_parallel(run_dir, pcfg);
         auto pipeline_end = std::chrono::steady_clock::now();
 

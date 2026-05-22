@@ -315,14 +315,14 @@ void Pipeline::run_parallel(const std::filesystem::path& run_dir,
     scanner_runner.start();
 
     // ── Writer thread: reorder buffer → disk ─────────────────────────────────
-    std::ofstream txt_out(run_dir / "results.txt");
+    const std::string txt_path  = cfg.dry_run ? "/dev/null" : (run_dir / "results.txt").string();
+    const std::string json_path = cfg.dry_run ? "/dev/null" : (run_dir / "results.json").string();
+    std::ofstream txt_out(txt_path);
     if (!txt_out)
-        throw std::runtime_error("Cannot open output file: " +
-                                 (run_dir / "results.txt").string());
-    std::ofstream json_out(run_dir / "results.json");
+        throw std::runtime_error("Cannot open output file: " + txt_path);
+    std::ofstream json_out(json_path);
     if (!json_out)
-        throw std::runtime_error("Cannot open output file: " +
-                                 (run_dir / "results.json").string());
+        throw std::runtime_error("Cannot open output file: " + json_path);
 
     json_out << "{\n  \"phrases\": [";
     bool first_json = true;
