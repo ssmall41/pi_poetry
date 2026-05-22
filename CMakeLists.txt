@@ -29,6 +29,8 @@ FetchContent_Declare(
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(nlohmann_json tomlplusplus googletest cpp-httplib)
 
+find_package(Threads REQUIRED)
+
 # ── Stage libraries ───────────────────────────────────────────────────────────
 add_library(digit_source_lib STATIC src/digit_source/FileDigitSource.cpp)
 target_include_directories(digit_source_lib PUBLIC ${CMAKE_SOURCE_DIR}/include)
@@ -50,7 +52,8 @@ target_compile_options(phrase_scanner_lib PRIVATE -Wall -Wextra -Wpedantic)
 add_library(pipeline_lib STATIC src/pipeline/Pipeline.cpp)
 target_include_directories(pipeline_lib PUBLIC ${CMAKE_SOURCE_DIR}/include)
 target_link_libraries(pipeline_lib PUBLIC
-    digit_source_lib digit_mapper_lib word_finder_lib phrase_scanner_lib)
+    digit_source_lib digit_mapper_lib word_finder_lib phrase_scanner_lib
+    Threads::Threads)
 target_compile_options(pipeline_lib PRIVATE -Wall -Wextra -Wpedantic)
 
 add_library(result_analyzer_lib STATIC src/result_analyzer/ResultAnalyzer.cpp)
@@ -101,6 +104,9 @@ add_executable(pi_poetry_tests
     tests/test_config_validator.cpp
     tests/test_analyze_results.cpp
     tests/test_download_pi.cpp
+    tests/test_bounded_queue.cpp
+    tests/test_parallel_pipeline.cpp
+    tests/test_reorder_buffer.cpp
 )
 target_link_libraries(pi_poetry_tests PRIVATE
     digit_source_lib digit_mapper_lib word_finder_lib phrase_scanner_lib

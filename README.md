@@ -45,7 +45,8 @@ The configuration file is a [TOML](https://toml.io/) document passed via `--conf
 
 | Field | Default | Valid Values | Description |
 |-------|---------|--------------|-------------|
-| `mode` * | `"serial"` | `"serial"` | Controls how pipeline stages are scheduled. |
+| `mode` | `"serial"` | `"serial"`, `"parallel"` | Execution mode. `"serial"` runs all stages on one thread. `"parallel"` runs each stage with a pool of worker threads connected by bounded queues; the number of workers per stage is set by the `threads` field in each stage's section. |
+| `debug` | `false` | `true`, `false` | When true, prints a `[stage] worker N claimed package M (K remaining)` message to stdout each time a worker picks up a work package. Useful for observing parallelism; leave false for clean output in production runs. |
 
 ### `[digit_source]`
 
@@ -53,7 +54,8 @@ The configuration file is a [TOML](https://toml.io/) document passed via `--conf
 |-------|---------|--------------|-------------|
 | `type` * | `"file"` | `"file"` | Digit source implementation to use. |
 | `path` | `"data/pi_2000.txt"` | Any file path | Plain-text file of pi digits, one ASCII digit per byte. |
-| `threads` * | `1` | Positive integer | Worker threads for the digit source. |
+| `threads` | `1` | Positive integer | Number of worker threads that read digit chunks from the source and push them into the pipeline. |
+| `chunk_size` | `131072` | Positive integer | Number of digits each worker reads per work package. Values that are not a multiple of `digits_per_char` (2 for the default mapper) are silently rounded up. Larger chunks reduce coordination overhead; smaller chunks increase parallelism granularity. |
 
 ### `[digit_mapper]`
 
@@ -62,7 +64,7 @@ The configuration file is a [TOML](https://toml.io/) document passed via `--conf
 | `type` * | `"two-digit-block"` | `"two-digit-block"` | Mapper implementation to use. |
 | `alphabet` * | `"alpha-lower"` | `"alpha-lower"` | Character set to map digit pairs into. |
 | `base` * | `10` | `10` | Numeric base of the digit stream. |
-| `threads` * | `1` | Positive integer | Worker threads for the mapper. |
+| `threads` | `1` | Positive integer | Number of worker threads that convert digit packages to letter packages. |
 | `write_letter_sequence` | `false` | `true`, `false` | When true, writes the mapped letter sequence to `letter_sequence.txt` in the run directory. |
 
 ### `[word_finder]`
@@ -71,9 +73,9 @@ The configuration file is a [TOML](https://toml.io/) document passed via `--conf
 |-------|---------|--------------|-------------|
 | `type` * | `"aho-corasick-cpu"` | `"aho-corasick-cpu"` | Word-finder implementation to use. |
 | `dictionary` | `"dictionaries/english.txt"` | Any file path | Path to the word list, one word per line. |
-| `overlap_policy` | `"earliest-then-longest"` | `"earliest-then-longest"`, `"all-combos"` | How to resolve overlapping word matches. `"earliest-then-longest"` greedily picks one sequence: the match starting soonest, with ties broken by longest word. `"all-combos"` returns every possible consecutive chain of words, deduplicated and sorted by offset then first word; use this to explore all valid readings of the letter sequence. Note: `"all-combos"` only chains words that are directly adjacent (zero gap); the `max_gap` setting in `[phrase_scanner]` is ignored. |
-| `min_word_length` | `3` | Positive integer | Words shorter than this are ignored. |
-| `threads` * | `1` | Positive integer | Worker threads for the word finder. |
+| `overlap_policy` | `"earliest-then-longest"` | `"earliest-then-longest"`, `"all-combos"` | How to resolve overlapping word matches. `"earliest-then-longest"` greedily picks one non-overlapping sequence: the match starting soonest, with ties broken by longest word. `"all-combos"` enumerates every possible consecutive chain of non-overlapping words; use this to explore all valid readings. Note: `"all-combos"` chains only directly-adjacent words (zero gap between them); `max_gap` in `[phrase_scanner]` does not affect what chains are generated, only how they appear in output. |
+| `min_word_length` | `3` | Positive integer | Words shorter than this are ignored when loading the dictionary. |
+| `threads` | `1` | Positive integer | Number of worker threads that scan letter packages for dictionary words. |
 
 ### `[phrase_scanner]`
 
@@ -81,8 +83,8 @@ The configuration file is a [TOML](https://toml.io/) document passed via `--conf
 |-------|---------|--------------|-------------|
 | `type` * | `"human-review"` | `"human-review"` | Phrase-scanner implementation to use. |
 | `mode` * | `"gap-tolerant"` | `"gap-tolerant"` | How gaps between consecutive words are treated. |
-| `max_gap` | `5` | Non-negative integer | Maximum number of unmapped characters allowed between two consecutive words for them to be grouped into the same phrase. Has no effect when `[word_finder] overlap_policy = "all-combos"`, which only produces zero-gap sequences. |
-| `threads` * | `1` | Positive integer | Worker threads for the phrase scanner. |
+| `max_gap` | `5` | Non-negative integer | Maximum number of unmapped characters allowed between two consecutive words for them to be grouped into the same phrase. |
+| `threads` | `1` | Positive integer | Number of worker threads that group word matches into phrases. |
 
 ### `[analysis]`
 
@@ -90,7 +92,7 @@ The configuration file is a [TOML](https://toml.io/) document passed via `--conf
 |-------|---------|--------------|-------------|
 | `run_after_pipeline` | `false` | `true`, `false` | When true, automatically runs the result analyzer after the pipeline finishes. Writes per-length phrase files and `statistics.txt` into the run directory. When enabled, the timing output includes a separate `Analysis time` line in addition to `Pipeline time` and `Total time`. |
 
-\* Reserved — parsed but not yet used.
+\* Only one value is currently supported; the field is validated on startup.
 
 ## Dictionary
 

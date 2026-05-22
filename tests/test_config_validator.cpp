@@ -57,11 +57,17 @@ TEST(ConfigValidator, ValidConfigReturnsNoErrors) {
 
 TEST(ConfigValidator, InvalidPipelineMode) {
     auto cfg = make_valid_table();
-    cfg["pipeline"].as_table()->insert_or_assign("mode", "parallel");
+    cfg["pipeline"].as_table()->insert_or_assign("mode", "batch");
     auto errors = validate_config(cfg);
     ASSERT_EQ(errors.size(), 1u);
     EXPECT_TRUE(any_error_contains(errors, "pipeline.mode"));
     EXPECT_TRUE(any_error_contains(errors, "serial"));
+}
+
+TEST(ConfigValidator, PipelineModeParallelIsValid) {
+    auto cfg = make_valid_table();
+    cfg["pipeline"].as_table()->insert_or_assign("mode", "parallel");
+    EXPECT_TRUE(validate_config(cfg).empty());
 }
 
 TEST(ConfigValidator, InvalidDigitSourceType) {
@@ -122,11 +128,16 @@ TEST(ConfigValidator, InvalidPhraseScannerMode) {
 
 TEST(ConfigValidator, InvalidDigitSourceThreads) {
     auto cfg = make_valid_table();
-    cfg["digit_source"].as_table()->insert_or_assign("threads", 4);
+    cfg["digit_source"].as_table()->insert_or_assign("threads", 0);
     auto errors = validate_config(cfg);
     ASSERT_EQ(errors.size(), 1u);
     EXPECT_TRUE(any_error_contains(errors, "digit_source.threads"));
-    EXPECT_TRUE(any_error_contains(errors, "1"));
+}
+
+TEST(ConfigValidator, DigitSourceThreadsMultipleIsValid) {
+    auto cfg = make_valid_table();
+    cfg["digit_source"].as_table()->insert_or_assign("threads", 4);
+    EXPECT_TRUE(validate_config(cfg).empty());
 }
 
 TEST(ConfigValidator, InvalidDigitMapperBase) {
@@ -140,29 +151,26 @@ TEST(ConfigValidator, InvalidDigitMapperBase) {
 
 TEST(ConfigValidator, InvalidDigitMapperThreads) {
     auto cfg = make_valid_table();
-    cfg["digit_mapper"].as_table()->insert_or_assign("threads", 2);
+    cfg["digit_mapper"].as_table()->insert_or_assign("threads", 0);
     auto errors = validate_config(cfg);
     ASSERT_EQ(errors.size(), 1u);
     EXPECT_TRUE(any_error_contains(errors, "digit_mapper.threads"));
-    EXPECT_TRUE(any_error_contains(errors, "1"));
 }
 
 TEST(ConfigValidator, InvalidWordFinderThreads) {
     auto cfg = make_valid_table();
-    cfg["word_finder"].as_table()->insert_or_assign("threads", 8);
+    cfg["word_finder"].as_table()->insert_or_assign("threads", 0);
     auto errors = validate_config(cfg);
     ASSERT_EQ(errors.size(), 1u);
     EXPECT_TRUE(any_error_contains(errors, "word_finder.threads"));
-    EXPECT_TRUE(any_error_contains(errors, "1"));
 }
 
 TEST(ConfigValidator, InvalidPhraseScannerThreads) {
     auto cfg = make_valid_table();
-    cfg["phrase_scanner"].as_table()->insert_or_assign("threads", 3);
+    cfg["phrase_scanner"].as_table()->insert_or_assign("threads", 0);
     auto errors = validate_config(cfg);
     ASSERT_EQ(errors.size(), 1u);
     EXPECT_TRUE(any_error_contains(errors, "phrase_scanner.threads"));
-    EXPECT_TRUE(any_error_contains(errors, "1"));
 }
 
 // ── Active fields ─────────────────────────────────────────────────────────────
@@ -264,8 +272,8 @@ TEST(ConfigValidator, OutputDirAnyStringIsValid) {
 
 TEST(ConfigValidator, MultipleErrorsAllReported) {
     auto cfg = make_valid_table();
-    cfg["pipeline"].as_table()->insert_or_assign("mode", "parallel");
-    cfg["digit_source"].as_table()->insert_or_assign("threads", 4);
+    cfg["pipeline"].as_table()->insert_or_assign("mode", "batch");       // invalid mode
+    cfg["digit_source"].as_table()->insert_or_assign("threads", 0);      // invalid: < 1
     cfg["word_finder"].as_table()->insert_or_assign("min_word_length", 0);
     cfg["phrase_scanner"].as_table()->insert_or_assign("max_gap", -1);
     auto errors = validate_config(cfg);

@@ -43,6 +43,7 @@ public:
         std::vector<std::pair<std::size_t, std::string>>& raw);
 
     OverlapPolicy get_overlap_policy() const { return policy_; }
+    std::size_t max_word_length() const { return max_word_len_; }
 
 private:
     struct AcNode {
@@ -56,7 +57,7 @@ private:
     std::vector<AcNode> nodes_;
     OverlapPolicy policy_{OverlapPolicy::EarliestThenLongest};
     std::size_t min_word_length_{1};
-    std::size_t prev_match_end_{0};
+    std::size_t max_word_len_{0};
     bool built_{false};
 
     std::vector<std::vector<WordMatch>> apply_earliest_then_longest(

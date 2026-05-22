@@ -3,7 +3,6 @@
 #include <cassert>
 #include <fstream>
 #include <functional>
-#include <limits>
 #include <map>
 #include <queue>
 #include <string>
@@ -25,6 +24,7 @@ void AhoCorasickCPU::insert_word(const std::string& word) {
         cur = nodes_[cur].children[idx];
     }
     nodes_[cur].output_word = word;
+    if (word.size() > max_word_len_) max_word_len_ = word.size();
 }
 
 void AhoCorasickCPU::build() {
@@ -58,7 +58,6 @@ void AhoCorasickCPU::build() {
         }
     }
     built_ = true;
-    prev_match_end_ = std::numeric_limits<std::size_t>::max();
 }
 
 void AhoCorasickCPU::load_dictionary(const std::string& path) {
@@ -127,18 +126,18 @@ std::vector<std::vector<WordMatch>> AhoCorasickCPU::apply_earliest_then_longest(
               });
 
     std::vector<WordMatch> result;
-    std::size_t scan_pos = 0;  // earliest position we can still accept
+    std::size_t scan_pos  = 0;
+    std::size_t prev_end  = 0;
 
     for (auto& [local_start, word] : raw) {
-        if (local_start < scan_pos) continue;  // consumed by earlier selection
+        if (local_start < scan_pos) continue;
 
         std::size_t global_start = global_offset + local_start;
-        // prev_match_end_ is ETL-only state; not used by AllCombos
-        bool consecutive = (global_start == prev_match_end_);
+        bool consecutive = !result.empty() && (global_start == prev_end);
         result.push_back({word, global_start, word.size(), consecutive});
 
         scan_pos = local_start + word.size();
-        prev_match_end_ = global_start + word.size();
+        prev_end = global_start + word.size();
     }
 
     return { result };

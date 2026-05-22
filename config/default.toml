@@ -2,13 +2,15 @@
 dir = "outputs"
 
 [pipeline]
-mode = "serial"
+mode = "parallel"
+debug = false
+dry_run = false
 
 [digit_source]
 type = "file"
 path = "data/pi_1000000.txt"
 threads = 1
-chunk_size = 128
+chunk_size = 32768
 
 [digit_mapper]
 type = "two-digit-block"

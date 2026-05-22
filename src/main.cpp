@@ -59,6 +59,13 @@ int main(int argc, char* argv[]) {
         std::string policy_str = config["word_finder"]["overlap_policy"].value_or(
             std::string("earliest-then-longest"));
 
+        int digit_threads   = config["digit_source"]["threads"].value_or(1);
+        int mapper_threads  = config["digit_mapper"]["threads"].value_or(1);
+        int finder_threads  = config["word_finder"]["threads"].value_or(1);
+        int scanner_threads = config["phrase_scanner"]["threads"].value_or(1);
+        bool debug          = config["pipeline"]["debug"].value_or(false);
+        bool dry_run        = config["pipeline"]["dry_run"].value_or(false);
+
         FileDigitSource source(digit_path);
         TwoDigitBlockMapper mapper;
         AhoCorasickCPU finder;
@@ -70,7 +77,16 @@ int main(int argc, char* argv[]) {
         HumanReviewScanner scanner(max_gap);
 
         Pipeline pipeline(source, mapper, finder, scanner);
-        pipeline.run(run_dir, write_letter_sequence, chunk_size);
+        Pipeline::ParallelConfig pcfg;
+        pcfg.chunk_size      = chunk_size;
+        pcfg.write_letters   = write_letter_sequence;
+        pcfg.digit_threads   = digit_threads;
+        pcfg.mapper_threads  = mapper_threads;
+        pcfg.finder_threads  = finder_threads;
+        pcfg.scanner_threads = scanner_threads;
+        pcfg.debug           = debug;
+        pcfg.dry_run         = dry_run;
+        pipeline.run_parallel(run_dir, pcfg);
         auto pipeline_end = std::chrono::steady_clock::now();
 
         if (run_analysis) {

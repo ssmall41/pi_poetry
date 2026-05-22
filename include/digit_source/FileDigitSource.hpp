@@ -7,16 +7,19 @@
 class FileDigitSource final : public DigitSource {
 public:
     explicit FileDigitSource(const std::string& path);
+    ~FileDigitSource() override;
 
     std::size_t next_chunk(uint8_t* buffer, std::size_t n) override;
     void reset() override;
     bool is_finite() const override { return true; }
     std::optional<uint64_t> estimated_length() const override;
     int base() const override { return 10; }
+    std::size_t read_at(std::size_t digit_offset, uint8_t* buffer, std::size_t n) override;
 
 private:
     std::string path_;
     std::ifstream file_;
     mutable std::mutex mutex_;
     uint64_t digit_count_{0};
+    int fd_{-1};
 };
