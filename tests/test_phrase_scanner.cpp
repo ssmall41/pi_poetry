@@ -18,7 +18,6 @@ TEST(HumanReviewScanner, SingleWordIsIsolated) {
     ASSERT_EQ(phrases.size(), 1u);
     EXPECT_EQ(phrases[0].words, (std::vector<std::string>{"cat"}));
     EXPECT_EQ(phrases[0].start_offset, 0u);
-    EXPECT_TRUE(phrases[0].gap_sizes.empty());
 }
 
 TEST(HumanReviewScanner, TwoAdjacentWords) {
@@ -30,23 +29,11 @@ TEST(HumanReviewScanner, TwoAdjacentWords) {
     ASSERT_EQ(phrases.size(), 1u);
     EXPECT_EQ(phrases[0].start_offset, 0u);
     EXPECT_EQ(phrases[0].words, (std::vector<std::string>{"cat", "dog"}));
-    EXPECT_EQ(phrases[0].gap_sizes, (std::vector<int>{0}));
 }
 
-TEST(HumanReviewScanner, GapExactlyAtLimit) {
-    HumanReviewScanner hs;  // default max_gap = 5
-    // cat ends at 3, dog starts at 8: gap = 8 - 3 = 5 (== G, included)
-    auto phrases = hs.process_words({
-        make_word("cat", 0),
-        make_word("dog", 8),
-    });
-    ASSERT_EQ(phrases.size(), 1u);
-    EXPECT_EQ(phrases[0].gap_sizes, (std::vector<int>{5}));
-}
-
-TEST(HumanReviewScanner, TwoWordsGapBeyondLimitBothIsolated) {
+TEST(HumanReviewScanner, TwoWordsWithNonZeroGapAreIsolated) {
     HumanReviewScanner hs;
-    // cat ends at 3, dog starts at 9: gap = 9 - 3 = 6 > 5 — both isolated
+    // cat ends at 3, dog starts at 9: gap = 9 - 3 = 6 — both isolated
     auto phrases = hs.process_words({
         make_word("cat", 0),
         make_word("dog", 9),
@@ -54,23 +41,8 @@ TEST(HumanReviewScanner, TwoWordsGapBeyondLimitBothIsolated) {
     ASSERT_EQ(phrases.size(), 2u);
     EXPECT_EQ(phrases[0].words, (std::vector<std::string>{"cat"}));
     EXPECT_EQ(phrases[0].start_offset, 0u);
-    EXPECT_TRUE(phrases[0].gap_sizes.empty());
     EXPECT_EQ(phrases[1].words, (std::vector<std::string>{"dog"}));
     EXPECT_EQ(phrases[1].start_offset, 9u);
-    EXPECT_TRUE(phrases[1].gap_sizes.empty());
-}
-
-TEST(HumanReviewScanner, ThreeWordPhraseWithMixedGaps) {
-    HumanReviewScanner hs;
-    // meh(3) at 113 ends at 116; tut(3) at 121 gap=5; joe(3) at 124 gap=0
-    auto phrases = hs.process_words({
-        make_word("meh", 113),
-        make_word("tut", 121),
-        make_word("joe", 124),
-    });
-    ASSERT_EQ(phrases.size(), 1u);
-    EXPECT_EQ(phrases[0].words, (std::vector<std::string>{"meh", "tut", "joe"}));
-    EXPECT_EQ(phrases[0].gap_sizes, (std::vector<int>{5, 0}));
 }
 
 TEST(HumanReviewScanner, TwoSeparatePhrases) {
@@ -92,7 +64,7 @@ TEST(HumanReviewScanner, TwoSeparatePhrases) {
 
 TEST(HumanReviewScanner, PhrasePlusIsolatedWord) {
     HumanReviewScanner hs;
-    // cat(0)+dog(3) form one phrase (gap=0 ≤ max_gap); far(50) is isolated
+    // cat(0)+dog(3) form one phrase (consecutive); far(50) is isolated
     auto phrases = hs.process_words({
         make_word("cat", 0),
         make_word("dog", 3),
@@ -101,10 +73,8 @@ TEST(HumanReviewScanner, PhrasePlusIsolatedWord) {
     ASSERT_EQ(phrases.size(), 2u);
     EXPECT_EQ(phrases[0].start_offset, 0u);
     EXPECT_EQ(phrases[0].words, (std::vector<std::string>{"cat", "dog"}));
-    EXPECT_EQ(phrases[0].gap_sizes, (std::vector<int>{0}));
     EXPECT_EQ(phrases[1].start_offset, 50u);
     EXPECT_EQ(phrases[1].words, (std::vector<std::string>{"far"}));
-    EXPECT_TRUE(phrases[1].gap_sizes.empty());
 }
 
 TEST(HumanReviewScanner, JsonOutputStructure) {
@@ -121,7 +91,6 @@ TEST(HumanReviewScanner, JsonOutputStructure) {
     ASSERT_EQ(j["phrases"].size(), 1u);
     EXPECT_TRUE(j["phrases"][0].contains("start_offset"));
     EXPECT_TRUE(j["phrases"][0].contains("words"));
-    EXPECT_TRUE(j["phrases"][0].contains("gap_sizes"));
     EXPECT_EQ(j["phrases"][0]["start_offset"].get<std::size_t>(), 0u);
     EXPECT_EQ(j["phrases"][0]["words"].get<std::vector<std::string>>(),
               (std::vector<std::string>{"cat", "dog"}));
@@ -136,7 +105,6 @@ TEST(HumanReviewScanner, IsolatedWordJsonOutput) {
     ASSERT_EQ(j["phrases"].size(), 1u);
     EXPECT_EQ(j["phrases"][0]["words"].get<std::vector<std::string>>(),
               (std::vector<std::string>{"fox"}));
-    EXPECT_TRUE(j["phrases"][0]["gap_sizes"].empty());
 }
 
 // ── Streaming API ────────────────────────────────────────────────────────────
@@ -163,8 +131,7 @@ TEST(HumanReviewScanner, StreamingEquivalence) {
     ASSERT_EQ(streamed.size(), full.size());
     for (std::size_t i = 0; i < full.size(); ++i) {
         EXPECT_EQ(streamed[i].start_offset, full[i].start_offset);
-        EXPECT_EQ(streamed[i].words,        full[i].words);
-        EXPECT_EQ(streamed[i].gap_sizes,    full[i].gap_sizes);
+        EXPECT_EQ(streamed[i].words, full[i].words);
     }
 }
 
@@ -183,15 +150,15 @@ TEST(HumanReviewScanner, StreamingFlush) {
     EXPECT_EQ(phrases[0].start_offset, 5u);
 }
 
-TEST(HumanReviewScanner, StreamingFinalizesOnGapExceed) {
-    // When a new word's start exceeds last_end + max_gap, the current phrase
+TEST(HumanReviewScanner, StreamingFinalizesOnNonZeroGap) {
+    // When a new word has any gap from the previous word, the current phrase
     // is finalized immediately (before flush).
-    HumanReviewScanner hs;  // max_gap = 5
+    HumanReviewScanner hs;
     std::vector<PhraseMatch> phrases;
     auto on_phrase = [&](PhraseMatch p) { phrases.push_back(std::move(p)); };
 
-    // cat ends at 3; dog at 9 → gap = 6 > 5 → cat finalized when dog arrives
-    hs.process_words_streaming({make_word("cat", 0), make_word("dog", 9)}, on_phrase);
+    // cat ends at 3; dog at 4 → gap = 1 → cat finalized when dog arrives
+    hs.process_words_streaming({make_word("cat", 0), make_word("dog", 4)}, on_phrase);
     ASSERT_EQ(phrases.size(), 1u);
     EXPECT_EQ(phrases[0].words, (std::vector<std::string>{"cat"}));
 
@@ -214,6 +181,5 @@ TEST(HumanReviewScanner, StreamingBatchBoundaryDoesNotSplitPhrase) {
     hs.flush_streaming(on_phrase);
     ASSERT_EQ(phrases.size(), 1u);
     EXPECT_EQ(phrases[0].words, (std::vector<std::string>{"cat", "dog"}));
-    EXPECT_EQ(phrases[0].gap_sizes, (std::vector<int>{0}));
 }
 

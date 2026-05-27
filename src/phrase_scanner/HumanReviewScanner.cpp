@@ -3,12 +3,6 @@
 #include <iostream>
 #include <nlohmann/json.hpp>
 
-HumanReviewScanner::HumanReviewScanner(int max_gap) : max_gap_(max_gap) {}
-
-void HumanReviewScanner::set_gap_policy(GapPolicy policy) {
-    policy_ = policy;
-}
-
 std::vector<PhraseMatch> HumanReviewScanner::process_words(
     const std::vector<WordMatch>& word_stream) {
 
@@ -23,7 +17,6 @@ std::vector<PhraseMatch> HumanReviewScanner::process_words(
 
     std::vector<PhraseMatch> result;
 
-    // Greedy merge: build phrases by extending as long as gap <= max_gap_
     std::size_t i = 0;
     while (i < sorted.size()) {
         PhraseMatch phrase;
@@ -35,8 +28,7 @@ std::vector<PhraseMatch> HumanReviewScanner::process_words(
         while (j < sorted.size()) {
             int gap = static_cast<int>(sorted[j]->start) -
                       static_cast<int>(prev_end);
-            if (gap < 0 || gap > max_gap_) break;
-            phrase.gap_sizes.push_back(gap);
+            if (gap != 0) break;
             phrase.words.push_back(sorted[j]->word);
             prev_end = sorted[j]->start + sorted[j]->length;
             ++j;
@@ -62,14 +54,13 @@ void HumanReviewScanner::process_words_streaming(
             pending_end_ = w.start + w.length;
         } else {
             int gap = static_cast<int>(w.start) - static_cast<int>(pending_end_);
-            if (gap < 0 || gap > max_gap_) {
+            if (gap != 0) {
                 on_phrase(std::move(*pending_phrase_));
                 pending_phrase_.emplace();
                 pending_phrase_->start_offset = w.start;
                 pending_phrase_->words.push_back(w.word);
                 pending_end_ = w.start + w.length;
             } else {
-                pending_phrase_->gap_sizes.push_back(gap);
                 pending_phrase_->words.push_back(w.word);
                 pending_end_ = w.start + w.length;
             }
@@ -92,11 +83,6 @@ void HumanReviewScanner::write_json_phrase(std::ostream& out, const PhraseMatch&
         if (i > 0) out << ',';
         out << '"' << p.words[i] << '"';
     }
-    out << "],\"gap_sizes\":[";
-    for (std::size_t i = 0; i < p.gap_sizes.size(); ++i) {
-        if (i > 0) out << ',';
-        out << p.gap_sizes[i];
-    }
     out << "]}";
 }
 
@@ -108,7 +94,6 @@ void HumanReviewScanner::write_json(const std::vector<PhraseMatch>& phrases,
         nlohmann::json entry;
         entry["start_offset"] = p.start_offset;
         entry["words"] = p.words;
-        entry["gap_sizes"] = p.gap_sizes;
         j["phrases"].push_back(std::move(entry));
     }
     out << j.dump(2) << '\n';

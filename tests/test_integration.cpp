@@ -66,7 +66,6 @@ TEST(DigitSeqIntegration, Seq1_PhrasesFound) {
     ASSERT_EQ(phrases.size(), 1u);
     EXPECT_EQ(phrases[0].start_offset, 3u);
     EXPECT_EQ(phrases[0].words,     (std::vector<std::string>{"taw","hale","of","at","ale"}));
-    EXPECT_EQ(phrases[0].gap_sizes, (std::vector<int>{0, 0, 0, 0}));
 }
 
 // ── Sequence 2: 1616161622070011041405001900110416161616
@@ -100,7 +99,6 @@ TEST(DigitSeqIntegration, Seq2_PhrasesFound) {
     ASSERT_EQ(phrases.size(), 1u);
     EXPECT_EQ(phrases[0].start_offset, 4u);
     EXPECT_EQ(phrases[0].words,     (std::vector<std::string>{"whale","of","at","ale"}));
-    EXPECT_EQ(phrases[0].gap_sizes, (std::vector<int>{0, 0, 0}));
 }
 
 // ── Sequence 3: 4216424248070011046605001900110416161616
@@ -134,7 +132,6 @@ TEST(DigitSeqIntegration, Seq3_PhrasesFound) {
     ASSERT_EQ(phrases.size(), 1u);
     EXPECT_EQ(phrases[0].start_offset, 4u);
     EXPECT_EQ(phrases[0].words,     (std::vector<std::string>{"whale","of","at","ale"}));
-    EXPECT_EQ(phrases[0].gap_sizes, (std::vector<int>{0, 0, 0}));
 }
 
 // ── Sequence 4: 001712141704
@@ -165,7 +162,6 @@ TEST(DigitSeqIntegration, Seq4_PhrasesFound) {
     ASSERT_EQ(phrases.size(), 1u);
     EXPECT_EQ(phrases[0].start_offset, 0u);
     EXPECT_EQ(phrases[0].words,     (std::vector<std::string>{"armor","e"}));
-    EXPECT_EQ(phrases[0].gap_sizes, (std::vector<int>{0}));
 }
 
 // ── Sequence 5: 0511000618190005050417
@@ -196,7 +192,6 @@ TEST(DigitSeqIntegration, Seq5_PhrasesFound) {
     ASSERT_EQ(phrases.size(), 1u);
     EXPECT_EQ(phrases[0].start_offset, 0u);
     EXPECT_EQ(phrases[0].words,     (std::vector<std::string>{"flagstaff","er"}));
-    EXPECT_EQ(phrases[0].gap_sizes, (std::vector<int>{0}));
 }
 
 // ── Sequence 6: 051100060618190005050417
@@ -231,5 +226,4 @@ TEST(DigitSeqIntegration, Seq6_PhrasesFound) {
     ASSERT_EQ(phrases.size(), 1u);
     EXPECT_EQ(phrases[0].start_offset, 0u);
     EXPECT_EQ(phrases[0].words,     (std::vector<std::string>{"flag","gs","ta","ff","er"}));
-    EXPECT_EQ(phrases[0].gap_sizes, (std::vector<int>{0, 0, 0, 0}));
 }

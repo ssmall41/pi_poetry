@@ -165,7 +165,7 @@ struct WordMatch {
 
 ## Stage 4: Phrase Scanner
 
-**Purpose:** Group consecutive word matches into phrases, tolerating small gaps of unmapped characters between words.
+**Purpose:** Group directly consecutive word matches into phrases.
 
 **Key files:**
 - [include/phrase_scanner/PhraseScanner.hpp](../include/phrase_scanner/PhraseScanner.hpp) — abstract interface
@@ -180,23 +180,22 @@ struct WordMatch {
 struct PhraseMatch {
     size_t start_offset;    // global character offset of the first word
     vector<string> words;   // words in the phrase, in order
-    vector<int> gap_sizes;  // character gaps between consecutive words
 };
 ```
 
-**Grouping algorithm (gap-tolerant mode):**
+**Grouping algorithm:**
 
 ```
 Sort words by start offset.
 For each word:
     gap = word.start − previous_word.end
-    if gap ≤ max_gap:
+    if gap == 0:
         extend the current phrase
     else:
         emit current phrase, start a new one
 ```
 
-A gap of 0 means the words are consecutive (touching). Gaps up to `max_gap` (configurable; default 5) are accepted to allow for occasional unmapped character noise between real words.
+Only words with zero gap (touching) are grouped into the same phrase.
 
 **Streaming support:** In the parallel pipeline, phrases may span chunk boundaries. `process_words_streaming(batch, on_phrase)` accumulates a pending phrase across calls. `flush_streaming(on_phrase)` emits the final pending phrase at end-of-stream.
 

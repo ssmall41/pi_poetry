@@ -27,7 +27,7 @@ struct PipelineFixture {
     FileDigitSource    source{digit_file.string()};
     TwoDigitBlockMapper mapper;
     AhoCorasickCPU     finder;
-    HumanReviewScanner scanner{5};
+    HumanReviewScanner scanner;
 
     PipelineFixture() {
         finder.build();
@@ -101,7 +101,7 @@ TEST(Pipeline_AllCombos, ProducesAllSequencesInResults) {
     finder.insert_word("b");
     finder.build();
     finder.set_overlap_policy(OverlapPolicy::AllCombos);
-    HumanReviewScanner scanner(0);
+    HumanReviewScanner scanner;
 
     Pipeline pipeline(source, mapper, finder, scanner);
     pipeline.run(run_dir);
@@ -141,7 +141,7 @@ TEST(Pipeline_AllCombos, SortsByOffsetThenFirstWord) {
     finder.insert_word("b");
     finder.build();
     finder.set_overlap_policy(OverlapPolicy::AllCombos);
-    HumanReviewScanner scanner(0);
+    HumanReviewScanner scanner;
 
     Pipeline pipeline(source, mapper, finder, scanner);
     pipeline.run(run_dir);
@@ -211,7 +211,7 @@ TEST(Pipeline_OverlapPolicy, ETLPhrasesAreSubsetOfAllCombos) {
         AhoCorasickCPU finder;
         finder.load_dictionary(dict);
         finder.build();
-        HumanReviewScanner scanner{0};
+        HumanReviewScanner scanner;
         Pipeline{source, mapper, finder, scanner}.run(etl_dir);
     }
     {   // AllCombos run (max_gap=0 for consecutive-only phrases)
@@ -221,7 +221,7 @@ TEST(Pipeline_OverlapPolicy, ETLPhrasesAreSubsetOfAllCombos) {
         finder.set_overlap_policy(OverlapPolicy::AllCombos);
         finder.load_dictionary(dict);
         finder.build();
-        HumanReviewScanner scanner{0};
+        HumanReviewScanner scanner;
         Pipeline{source, mapper, finder, scanner}.run(ac_dir);
     }
 
@@ -256,7 +256,7 @@ TEST(Pipeline_Streaming, SmallInputETLOutputMatchesBaseline) {
     AhoCorasickCPU finder;
     finder.insert_word("fab");  // "fphab" contains no complete word with this dict
     finder.build();
-    HumanReviewScanner scanner(5);
+    HumanReviewScanner scanner;
 
     Pipeline pipeline(source, mapper, finder, scanner);
     pipeline.run(run_dir, false, 4);  // chunk_size=4 (tiny, forces multiple chunks)
@@ -283,7 +283,7 @@ TEST(Pipeline_Streaming, WordSpanningChunkBoundaryIsFound) {
     AhoCorasickCPU finder;
     finder.insert_word("abc");
     finder.build();
-    HumanReviewScanner scanner(0);
+    HumanReviewScanner scanner;
 
     Pipeline pipeline(source, mapper, finder, scanner);
     pipeline.run(run_dir, false, 2);  // chunk_size=2 digits = 1 char/chunk
@@ -313,7 +313,7 @@ TEST(Pipeline_Analysis, AnalyzeAfterRunProducesStatisticsAndPhraseLengthFiles) {
     AhoCorasickCPU finder;
     finder.load_dictionary(PI_POETRY_SOURCE_DIR "/dictionaries/english_trimmed.txt");
     finder.build();
-    HumanReviewScanner scanner(5);
+    HumanReviewScanner scanner;
 
     Pipeline pipeline(source, mapper, finder, scanner);
     pipeline.run(run_dir);

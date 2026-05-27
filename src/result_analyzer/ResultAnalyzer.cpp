@@ -20,7 +20,6 @@ AnalysisData parse_results_json(const std::string& json_text) {
         Phrase p;
         p.start_offset = entry.at("start_offset").get<std::size_t>();
         p.words        = entry.at("words").get<std::vector<std::string>>();
-        p.gap_sizes    = entry.at("gap_sizes").get<std::vector<int>>();
         data.phrases.push_back(std::move(p));
     }
     return data;
@@ -32,10 +31,7 @@ std::vector<WordOccurrence> compute_word_occurrences(const AnalysisData& data) {
         std::size_t offset = phrase.start_offset;
         for (std::size_t i = 0; i < phrase.words.size(); ++i) {
             result.push_back({phrase.words[i], offset});
-            if (i < phrase.gap_sizes.size()) {
-                offset += phrase.words[i].size()
-                        + static_cast<std::size_t>(phrase.gap_sizes[i]);
-            }
+            offset += phrase.words[i].size();
         }
     }
     return result;

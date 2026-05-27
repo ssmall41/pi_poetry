@@ -31,8 +31,6 @@ queue_size = 16
 
 [phrase_scanner]
 type = "human-review"
-mode = "gap-tolerant"
-max_gap = 5
 threads = 1
 queue_size = 16
 

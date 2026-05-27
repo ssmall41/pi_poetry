@@ -52,7 +52,7 @@ TEST(ParallelPipeline, ParallelMatchesSerial_ETL) {
         AhoCorasickCPU finder;
         finder.load_dictionary(dict);
         finder.build();
-        HumanReviewScanner scanner(5);
+        HumanReviewScanner scanner;
         Pipeline{source, mapper, finder, scanner}.run(serial_dir);
     }
 
@@ -63,7 +63,7 @@ TEST(ParallelPipeline, ParallelMatchesSerial_ETL) {
         AhoCorasickCPU finder;
         finder.load_dictionary(dict);
         finder.build();
-        HumanReviewScanner scanner(5);
+        HumanReviewScanner scanner;
         Pipeline::ParallelConfig cfg;
         cfg.chunk_size      = 8192;
         cfg.digit_threads   = 2;
@@ -109,7 +109,7 @@ TEST(ParallelPipeline, ParallelMatchesSerial_AllCombos_MultiChunk) {
         finder.set_overlap_policy(OverlapPolicy::AllCombos);
         finder.load_dictionary(dict);
         finder.build();
-        HumanReviewScanner scanner(5);
+        HumanReviewScanner scanner;
         Pipeline{source, mapper, finder, scanner}.run(serial_dir);
     }
     {
@@ -119,7 +119,7 @@ TEST(ParallelPipeline, ParallelMatchesSerial_AllCombos_MultiChunk) {
         finder.set_overlap_policy(OverlapPolicy::AllCombos);
         finder.load_dictionary(dict);
         finder.build();
-        HumanReviewScanner scanner(5);
+        HumanReviewScanner scanner;
         Pipeline::ParallelConfig cfg;
         cfg.chunk_size      = 100;
         cfg.digit_threads   = 1;
@@ -155,7 +155,7 @@ TEST(ParallelPipeline, AllCombosParallel_ProducesAllSequences) {
     finder.insert_word("b");
     finder.build();
     finder.set_overlap_policy(OverlapPolicy::AllCombos);
-    HumanReviewScanner scanner(0);
+    HumanReviewScanner scanner;
 
     Pipeline::ParallelConfig cfg;
     cfg.chunk_size      = 4;
@@ -203,7 +203,7 @@ TEST(ParallelPipeline, ParallelMatchesSerial_AllCombos) {
         finder.set_overlap_policy(OverlapPolicy::AllCombos);
         finder.load_dictionary(dict);
         finder.build();
-        HumanReviewScanner scanner(5);
+        HumanReviewScanner scanner;
         Pipeline{source, mapper, finder, scanner}.run(serial_dir);
     }
     {
@@ -213,7 +213,7 @@ TEST(ParallelPipeline, ParallelMatchesSerial_AllCombos) {
         finder.set_overlap_policy(OverlapPolicy::AllCombos);
         finder.load_dictionary(dict);
         finder.build();
-        HumanReviewScanner scanner(5);
+        HumanReviewScanner scanner;
         Pipeline::ParallelConfig cfg;
         cfg.chunk_size      = 8192;
         cfg.digit_threads   = 2;

@@ -115,15 +115,6 @@ TEST(ConfigValidator, InvalidPhraseScannerType) {
     EXPECT_TRUE(any_error_contains(errors, "human-review"));
 }
 
-TEST(ConfigValidator, InvalidPhraseScannerMode) {
-    auto cfg = make_valid_table();
-    cfg["phrase_scanner"].as_table()->insert_or_assign("mode", "strict");
-    auto errors = validate_config(cfg);
-    ASSERT_EQ(errors.size(), 1u);
-    EXPECT_TRUE(any_error_contains(errors, "phrase_scanner.mode"));
-    EXPECT_TRUE(any_error_contains(errors, "gap-tolerant"));
-}
-
 // ── Reserved integer fields ───────────────────────────────────────────────────
 
 TEST(ConfigValidator, InvalidDigitSourceThreads) {
@@ -219,27 +210,6 @@ TEST(ConfigValidator, MinWordLengthLargePositiveIsValid) {
     EXPECT_TRUE(validate_config(cfg).empty());
 }
 
-TEST(ConfigValidator, MaxGapZeroIsValid) {
-    auto cfg = make_valid_table();
-    cfg["phrase_scanner"].as_table()->insert_or_assign("max_gap", 0);
-    EXPECT_TRUE(validate_config(cfg).empty());
-}
-
-TEST(ConfigValidator, MaxGapPositiveIsValid) {
-    auto cfg = make_valid_table();
-    cfg["phrase_scanner"].as_table()->insert_or_assign("max_gap", 100);
-    EXPECT_TRUE(validate_config(cfg).empty());
-}
-
-TEST(ConfigValidator, MaxGapNegativeIsInvalid) {
-    auto cfg = make_valid_table();
-    cfg["phrase_scanner"].as_table()->insert_or_assign("max_gap", -1);
-    auto errors = validate_config(cfg);
-    ASSERT_EQ(errors.size(), 1u);
-    EXPECT_TRUE(any_error_contains(errors, "phrase_scanner.max_gap"));
-    EXPECT_TRUE(any_error_contains(errors, ">= 0"));
-}
-
 // ── File existence ────────────────────────────────────────────────────────────
 
 TEST(ConfigValidator, DigitSourcePathMissingFileIsInvalid) {
@@ -275,13 +245,11 @@ TEST(ConfigValidator, MultipleErrorsAllReported) {
     cfg["pipeline"].as_table()->insert_or_assign("mode", "batch");       // invalid mode
     cfg["digit_source"].as_table()->insert_or_assign("threads", 0);      // invalid: < 1
     cfg["word_finder"].as_table()->insert_or_assign("min_word_length", 0);
-    cfg["phrase_scanner"].as_table()->insert_or_assign("max_gap", -1);
     auto errors = validate_config(cfg);
-    ASSERT_EQ(errors.size(), 4u);
+    ASSERT_EQ(errors.size(), 3u);
     EXPECT_TRUE(any_error_contains(errors, "pipeline.mode"));
     EXPECT_TRUE(any_error_contains(errors, "digit_source.threads"));
     EXPECT_TRUE(any_error_contains(errors, "word_finder.min_word_length"));
-    EXPECT_TRUE(any_error_contains(errors, "phrase_scanner.max_gap"));
 }
 
 TEST(ConfigValidator, MissingOverlapPolicyUsesDefault) {
