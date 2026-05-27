@@ -340,3 +340,33 @@ TEST(ConfigValidator, AnalysisRunAfterPipelineWrongTypeIsInvalid) {
     ASSERT_EQ(errors.size(), 1u);
     EXPECT_TRUE(any_error_contains(errors, "analysis.run_after_pipeline"));
 }
+
+// ── phrase_scanner.min_phrase_length ──────────────────────────────────────────
+
+TEST(ConfigValidator, MinPhraseLengthAbsentIsValid) {
+    auto cfg = make_valid_table();
+    EXPECT_TRUE(validate_config(cfg).empty());
+}
+
+TEST(ConfigValidator, MinPhraseLength1IsValid) {
+    auto cfg = make_valid_table();
+    cfg["phrase_scanner"].as_table()->insert_or_assign("min_phrase_length", 1);
+    EXPECT_TRUE(validate_config(cfg).empty());
+}
+
+TEST(ConfigValidator, MinPhraseLengthZeroIsInvalid) {
+    auto cfg = make_valid_table();
+    cfg["phrase_scanner"].as_table()->insert_or_assign("min_phrase_length", 0);
+    auto errors = validate_config(cfg);
+    ASSERT_EQ(errors.size(), 1u);
+    EXPECT_TRUE(any_error_contains(errors, "phrase_scanner.min_phrase_length"));
+    EXPECT_TRUE(any_error_contains(errors, ">= 1"));
+}
+
+TEST(ConfigValidator, MinPhraseLengthWrongTypeIsInvalid) {
+    auto cfg = make_valid_table();
+    cfg["phrase_scanner"].as_table()->insert_or_assign("min_phrase_length", "two");
+    auto errors = validate_config(cfg);
+    ASSERT_EQ(errors.size(), 1u);
+    EXPECT_TRUE(any_error_contains(errors, "phrase_scanner.min_phrase_length"));
+}

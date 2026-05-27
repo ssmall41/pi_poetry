@@ -447,3 +447,98 @@ TEST(AhoCorasickCPU, AllCombos_AwhaleOfATale) {
     EXPECT_TRUE(has_seq({"aw", "hale", "of", "a", "tale"}));
 }
 #endif
+
+// ── min_phrase_length pre-filter ──────────────────────────────────────────────
+
+TEST(AhoCorasickCPU_MinPhraseLength, DefaultMin1AllowsSingleWordChain) {
+    AhoCorasickCPU ac;
+    ac.insert_word("cat");
+    ac.build();
+    auto r = do_scan(ac, "xcatz");
+    EXPECT_FALSE(r.empty());
+}
+
+TEST(AhoCorasickCPU_MinPhraseLength, Min2SkipsSingleWordChain_ETL) {
+    AhoCorasickCPU ac;
+    ac.set_min_phrase_length(2);
+    ac.insert_word("cat");
+    ac.build();
+    auto r = do_scan(ac, "xcatz");
+    EXPECT_TRUE(r.empty());
+}
+
+TEST(AhoCorasickCPU_MinPhraseLength, Min2AllowsTwoConsecutiveWords_ETL) {
+    AhoCorasickCPU ac;
+    ac.set_min_phrase_length(2);
+    ac.insert_word("cat");
+    ac.insert_word("dog");
+    ac.build();
+    auto r = do_scan(ac, "catdog");
+    ASSERT_EQ(r.size(), 1u);
+    ASSERT_EQ(r[0].size(), 2u);
+    EXPECT_EQ(r[0][0].word, "cat");
+    EXPECT_EQ(r[0][1].word, "dog");
+}
+
+TEST(AhoCorasickCPU_MinPhraseLength, Min3SkipsTwoConsecutiveWords_ETL) {
+    AhoCorasickCPU ac;
+    ac.set_min_phrase_length(3);
+    ac.insert_word("cat");
+    ac.insert_word("dog");
+    ac.build();
+    auto r = do_scan(ac, "catdog");
+    EXPECT_TRUE(r.empty());
+}
+
+TEST(AhoCorasickCPU_MinPhraseLength, Min2SkipsMixedChainWithNoRun_ETL) {
+    // "catXdog" → ETL produces chain [cat, dog] with a gap → no consecutive run of 2
+    AhoCorasickCPU ac;
+    ac.set_min_phrase_length(2);
+    ac.insert_word("cat");
+    ac.insert_word("dog");
+    ac.build();
+    auto r = do_scan(ac, "catXdog");
+    EXPECT_TRUE(r.empty());
+}
+
+TEST(AhoCorasickCPU_MinPhraseLength, Min2KeepsMixedChainWithRun_ETL) {
+    // "catdogXfox" → ETL chain [cat, dog, fox]: cat+dog form run of 2 ≥ 2 → kept
+    AhoCorasickCPU ac;
+    ac.set_min_phrase_length(2);
+    ac.insert_word("cat");
+    ac.insert_word("dog");
+    ac.insert_word("fox");
+    ac.build();
+    auto r = do_scan(ac, "catdogXfox");
+    ASSERT_EQ(r.size(), 1u);
+    ASSERT_EQ(r[0].size(), 3u);
+}
+
+TEST(AhoCorasickCPU_MinPhraseLength, Min2SkipsAllCombosChainNoConsecutive) {
+    // AllCombos on "catXdog": all chains have only isolated words → all dropped
+    AhoCorasickCPU ac;
+    ac.set_min_phrase_length(2);
+    ac.set_overlap_policy(OverlapPolicy::AllCombos);
+    ac.insert_word("cat");
+    ac.insert_word("dog");
+    ac.build();
+    auto r = do_scan(ac, "catXdog");
+    EXPECT_TRUE(r.empty());
+}
+
+TEST(AhoCorasickCPU_MinPhraseLength, Min2AllowsAllCombosChainWithPair) {
+    // AllCombos on "ab" with {a, ab, b}: chains [a], [a,b], [ab], [b]
+    // With min=2: only [a,b] has a consecutive pair → only [a,b] emitted
+    AhoCorasickCPU ac;
+    ac.set_min_phrase_length(2);
+    ac.set_overlap_policy(OverlapPolicy::AllCombos);
+    ac.insert_word("a");
+    ac.insert_word("ab");
+    ac.insert_word("b");
+    ac.build();
+    auto r = do_scan(ac, "ab");
+    ASSERT_EQ(r.size(), 1u);
+    ASSERT_EQ(r[0].size(), 2u);
+    EXPECT_EQ(r[0][0].word, "a");
+    EXPECT_EQ(r[0][1].word, "b");
+}

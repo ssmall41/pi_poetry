@@ -17,6 +17,8 @@ public:
         const std::function<void(PhraseMatch)>& on_phrase);
     void flush_streaming(const std::function<void(PhraseMatch)>& on_phrase);
 
+    void set_min_phrase_length(std::size_t min_len);
+
     static void write_json_phrase(std::ostream& out, const PhraseMatch& p);
     void write_json(const std::vector<PhraseMatch>& phrases, std::ostream& out) const;
 
@@ -24,4 +26,5 @@ private:
     // Streaming state
     std::optional<PhraseMatch> pending_phrase_;
     std::size_t pending_end_{0};
+    std::size_t min_phrase_length_{1};
 };

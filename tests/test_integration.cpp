@@ -227,3 +227,63 @@ TEST(DigitSeqIntegration, Seq6_PhrasesFound) {
     EXPECT_EQ(phrases[0].start_offset, 0u);
     EXPECT_EQ(phrases[0].words,     (std::vector<std::string>{"flag","gs","ta","ff","er"}));
 }
+
+// ── min_phrase_length integration ────────────────────────────────────────────
+
+TEST(DigitSeqIntegration, WordFinderPreFilter_Min2_DropsIsolatedChains) {
+    // "catXdog": two isolated words, no consecutive pair → word_finder drops both chains
+    AhoCorasickCPU ac;
+    ac.set_min_phrase_length(2);
+    ac.insert_word("cat");
+    ac.insert_word("dog");
+    ac.build();
+    auto r = ac.scan("catXdog", 7, 0);
+    EXPECT_TRUE(r.empty());
+}
+
+TEST(DigitSeqIntegration, PhraseScannerFilter_Min2_DropsSingleWords) {
+    HumanReviewScanner hs;
+    hs.set_min_phrase_length(2);
+    WordMatch cat{"cat", 0, 3, false};
+    auto phrases = hs.process_words({cat});
+    EXPECT_TRUE(phrases.empty());
+}
+
+TEST(DigitSeqIntegration, EndToEnd_Min2_KeepsTwoWordPhrases) {
+    // "catdog": cat(0,3) + dog(3,3) adjacent → phrase [cat,dog] with 2 words ≥ 2 → kept
+    AhoCorasickCPU ac;
+    ac.set_min_phrase_length(2);
+    ac.insert_word("cat");
+    ac.insert_word("dog");
+    ac.build();
+    auto chains = ac.scan("catdog", 6, 0);
+    ASSERT_EQ(chains.size(), 1u);
+
+    HumanReviewScanner hs;
+    hs.set_min_phrase_length(2);
+    auto phrases = hs.process_words(chains[0]);
+    ASSERT_EQ(phrases.size(), 1u);
+    EXPECT_EQ(phrases[0].words, (std::vector<std::string>{"cat", "dog"}));
+}
+
+TEST(DigitSeqIntegration, EndToEnd_Min3_FiltersTwoWordPhrases) {
+    // "qqqqwhaleofataleqqqq": the phrase [whale,of,at,ale] has 4 words ≥ 3 → kept
+    // but any isolated single words are dropped by both stages
+    const std::string letters = "qqqqwhaleofataleqqqq";
+    auto ac = build_finder(2);
+    ac.set_min_phrase_length(3);
+
+    HumanReviewScanner hs;
+    hs.set_min_phrase_length(3);
+
+    auto chains = ac.scan(letters.data(), letters.size(), 0);
+    std::vector<PhraseMatch> all_phrases;
+    for (const auto& chain : chains) {
+        auto p = hs.process_words(chain);
+        all_phrases.insert(all_phrases.end(), p.begin(), p.end());
+    }
+
+    // Every phrase in the output must have ≥ 3 words
+    for (const auto& phrase : all_phrases)
+        EXPECT_GE(phrase.words.size(), 3u) << "Phrase too short: " << phrase.words[0];
+}

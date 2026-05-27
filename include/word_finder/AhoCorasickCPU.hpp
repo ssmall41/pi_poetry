@@ -16,6 +16,7 @@ public:
     void load_dictionary(const std::string& path) override;
     void set_overlap_policy(OverlapPolicy policy) override;
     void set_min_word_length(std::size_t min_len);
+    void set_min_phrase_length(std::size_t min_len);
 
     // Insert a single word; call before build().
     void insert_word(const std::string& word);
@@ -67,6 +68,7 @@ private:
     std::vector<AcNode> nodes_;
     OverlapPolicy policy_{OverlapPolicy::EarliestThenLongest};
     std::size_t min_word_length_{1};
+    std::size_t min_phrase_length_{1};
     std::size_t max_word_len_{0};
     bool built_{false};
 

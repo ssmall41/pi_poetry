@@ -183,3 +183,82 @@ TEST(HumanReviewScanner, StreamingBatchBoundaryDoesNotSplitPhrase) {
     EXPECT_EQ(phrases[0].words, (std::vector<std::string>{"cat", "dog"}));
 }
 
+// ── min_phrase_length filter ──────────────────────────────────────────────────
+
+TEST(HumanReviewScanner_MinPhraseLength, DefaultMin1KeepsSingleWord) {
+    HumanReviewScanner hs;
+    auto phrases = hs.process_words({make_word("cat", 0)});
+    ASSERT_EQ(phrases.size(), 1u);
+}
+
+TEST(HumanReviewScanner_MinPhraseLength, Min2FiltersSingleWord_ProcessWords) {
+    HumanReviewScanner hs;
+    hs.set_min_phrase_length(2);
+    auto phrases = hs.process_words({make_word("cat", 0)});
+    EXPECT_TRUE(phrases.empty());
+}
+
+TEST(HumanReviewScanner_MinPhraseLength, Min2KeepsTwoWordPhrase_ProcessWords) {
+    HumanReviewScanner hs;
+    hs.set_min_phrase_length(2);
+    auto phrases = hs.process_words({
+        make_word("cat", 0, false),
+        make_word("dog", 3, true),
+    });
+    ASSERT_EQ(phrases.size(), 1u);
+    EXPECT_EQ(phrases[0].words, (std::vector<std::string>{"cat", "dog"}));
+}
+
+TEST(HumanReviewScanner_MinPhraseLength, Min2FiltersSingleKeepsLong_ProcessWords) {
+    // [cat(0), dog(3,adj), far(50)] → cat+dog kept (2 words ≥ 2); far alone dropped
+    HumanReviewScanner hs;
+    hs.set_min_phrase_length(2);
+    auto phrases = hs.process_words({
+        make_word("cat", 0, false),
+        make_word("dog", 3, true),
+        make_word("far", 50, false),
+    });
+    ASSERT_EQ(phrases.size(), 1u);
+    EXPECT_EQ(phrases[0].words, (std::vector<std::string>{"cat", "dog"}));
+}
+
+TEST(HumanReviewScanner_MinPhraseLength, Min2FiltersStreaming_SingleWordDropped) {
+    HumanReviewScanner hs;
+    hs.set_min_phrase_length(2);
+    std::vector<PhraseMatch> emitted;
+    auto on_phrase = [&](PhraseMatch p) { emitted.push_back(std::move(p)); };
+
+    // cat ends at 3, dog starts at 4: gap=1 → cat finalized as 1-word phrase → dropped
+    hs.process_words_streaming({make_word("cat", 0), make_word("dog", 4)}, on_phrase);
+    EXPECT_TRUE(emitted.empty());
+    hs.flush_streaming(on_phrase);
+    // dog also alone → dropped
+    EXPECT_TRUE(emitted.empty());
+}
+
+TEST(HumanReviewScanner_MinPhraseLength, Min2KeepsStreaming_TwoWordPhrase) {
+    HumanReviewScanner hs;
+    hs.set_min_phrase_length(2);
+    std::vector<PhraseMatch> emitted;
+    auto on_phrase = [&](PhraseMatch p) { emitted.push_back(std::move(p)); };
+
+    hs.process_words_streaming({make_word("cat", 0)}, on_phrase);
+    EXPECT_TRUE(emitted.empty());
+    hs.process_words_streaming({make_word("dog", 3)}, on_phrase);
+    EXPECT_TRUE(emitted.empty());  // still pending
+    hs.flush_streaming(on_phrase);
+    ASSERT_EQ(emitted.size(), 1u);
+    EXPECT_EQ(emitted[0].words, (std::vector<std::string>{"cat", "dog"}));
+}
+
+TEST(HumanReviewScanner_MinPhraseLength, Min3FiltersStreaming_TwoWordPhraseDropped) {
+    HumanReviewScanner hs;
+    hs.set_min_phrase_length(3);
+    std::vector<PhraseMatch> emitted;
+    auto on_phrase = [&](PhraseMatch p) { emitted.push_back(std::move(p)); };
+
+    hs.process_words_streaming({make_word("cat", 0), make_word("dog", 3)}, on_phrase);
+    hs.flush_streaming(on_phrase);
+    EXPECT_TRUE(emitted.empty());
+}
+
