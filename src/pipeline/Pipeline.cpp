@@ -152,7 +152,8 @@ private:
 
 class WordFinderWorker final : public StageWorker<LetterPackage, ComboPackage> {
 public:
-    explicit WordFinderWorker(AhoCorasickCPU& ac) : ac_(ac) {}
+    WordFinderWorker(AhoCorasickCPU& ac, bool write_letters)
+        : ac_(ac), write_letters_(write_letters) {}
     std::string stage_name() const override { return "word_finder"; }
 
     void process(LetterPackage pkg, const std::function<void(ComboPackage)>& emit) override {
@@ -169,7 +170,8 @@ public:
                       [&](const auto& p) { return p.first >= real_char_end; }),
                   raw.end());
 
-        const std::size_t chunk_id = pkg.seq_id;
+        const std::size_t chunk_id    = pkg.seq_id;
+        const std::size_t num_real    = pkg.num_real_chars;
 
         std::vector<ComboPackage> pending;
         std::size_t intra = 0;
@@ -187,15 +189,24 @@ public:
             cp.chunk_id               = chunk_id;
             cp.intra_chunk_seq_id     = 0;
             cp.final_package_in_chunk = true;
+            if (write_letters_) {
+                cp.letter_chars          = std::move(pkg.chars);
+                cp.num_real_letter_chars = num_real;
+            }
             emit(std::move(cp));
         } else {
             pending.back().final_package_in_chunk = true;
+            if (write_letters_) {
+                pending.back().letter_chars          = std::move(pkg.chars);
+                pending.back().num_real_letter_chars = num_real;
+            }
             for (auto& cp : pending) emit(std::move(cp));
         }
     }
 
 private:
     AhoCorasickCPU& ac_;
+    bool            write_letters_;
 };
 
 class PhraseScannerWorker final : public StageWorker<ComboPackage, PhrasePackage> {
@@ -208,6 +219,8 @@ public:
         out.chunk_id               = pkg.chunk_id;
         out.intra_chunk_seq_id     = pkg.intra_chunk_seq_id;
         out.final_package_in_chunk = pkg.final_package_in_chunk;
+        out.letter_chars           = std::move(pkg.letter_chars);
+        out.num_real_letter_chars  = pkg.num_real_letter_chars;
         auto phrases = scanner_.process_words(pkg.chain);
         out.json_strs.reserve(phrases.size());
         for (const auto& p : phrases) {
@@ -288,7 +301,7 @@ void Pipeline::run_parallel(const std::filesystem::path& run_dir,
     // ── Stage 3: word_finder workers (scan + apply overlap policy) ───────────
     std::vector<std::unique_ptr<StageWorker<LetterPackage, ComboPackage>>> finder_workers;
     for (int i = 0; i < cfg.finder_threads; ++i)
-        finder_workers.push_back(std::make_unique<WordFinderWorker>(*ac));
+        finder_workers.push_back(std::make_unique<WordFinderWorker>(*ac, cfg.write_letters));
     StageRunner<LetterPackage, ComboPackage> finder_runner(
         std::move(finder_workers), letter_q, combo_q, cfg.debug);
     finder_runner.start();
@@ -307,8 +320,28 @@ void Pipeline::run_parallel(const std::filesystem::path& run_dir,
     if (!json_out)
         throw std::runtime_error("Cannot open output file: " + json_path);
 
+    const std::string letters_path =
+        cfg.dry_run ? "/dev/null" : (run_dir / "letter_sequence.txt").string();
+    std::ofstream letters_out;
+    if (cfg.write_letters) {
+        letters_out.open(letters_path);
+        if (!letters_out)
+            throw std::runtime_error("Cannot open output file: " + letters_path);
+    }
+
     json_out << "{\n  \"phrases\": [";
     bool first_json = true;
+
+    auto flush_phrase = [&](PhrasePackage& p) {
+        for (std::size_t i = 0; i < p.json_strs.size(); ++i) {
+            if (!first_json) json_out << ',';
+            json_out << '\n' << p.json_strs[i];
+            first_json = false;
+        }
+        if (letters_out.is_open() && p.final_package_in_chunk)
+            letters_out.write(p.letter_chars.data(),
+                              static_cast<std::streamsize>(p.num_real_letter_chars));
+    };
 
     std::thread writer_thread([&] {
         ReorderBuffer<PhrasePackage> reorder;
@@ -316,21 +349,9 @@ void Pipeline::run_parallel(const std::filesystem::path& run_dir,
         while (phrase_q.pop(pp)) {
             reorder.submit(pp.chunk_id, pp.intra_chunk_seq_id,
                            pp.final_package_in_chunk, std::move(pp));
-            reorder.drain([&](PhrasePackage& p) {
-                for (std::size_t i = 0; i < p.json_strs.size(); ++i) {
-                    if (!first_json) json_out << ',';
-                    json_out << '\n' << p.json_strs[i];
-                    first_json = false;
-                }
-            });
+            reorder.drain(flush_phrase);
         }
-        reorder.drain_all([&](PhrasePackage& p) {
-            for (std::size_t i = 0; i < p.json_strs.size(); ++i) {
-                if (!first_json) json_out << ',';
-                json_out << '\n' << p.json_strs[i];
-                first_json = false;
-            }
-        });
+        reorder.drain_all(flush_phrase);
     });
 
     // ── Join all threads ──────────────────────────────────────────────────────
@@ -339,6 +360,9 @@ void Pipeline::run_parallel(const std::filesystem::path& run_dir,
     finder_runner.join();
     scanner_runner.join();
     writer_thread.join();
+
+    if (letters_out.is_open())
+        letters_out.put('\n');
 
     json_out << "\n  ]\n}\n";
 }

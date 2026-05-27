@@ -185,6 +185,84 @@ TEST(ParallelPipeline, AllCombosParallel_ProducesAllSequences) {
     EXPECT_TRUE(has_phrase(1, {"b"}));
 }
 
+// ── Letter sequence: parallel pipeline writes letter_sequence.txt ─────────────
+
+namespace {
+struct ParallelLetterFixture {
+    std::filesystem::path digit_file =
+        make_temp_digit_file("3141592653", "par_letter_digits.txt");
+    std::filesystem::path run_dir =
+        std::filesystem::temp_directory_path() / "par_letter_run";
+
+    FileDigitSource     source{digit_file.string()};
+    TwoDigitBlockMapper mapper;
+    AhoCorasickCPU      finder;
+    HumanReviewScanner  scanner;
+
+    ParallelLetterFixture() {
+        finder.build();
+        std::filesystem::create_directories(run_dir);
+    }
+    ~ParallelLetterFixture() {
+        std::filesystem::remove_all(run_dir);
+        std::filesystem::remove(digit_file);
+    }
+
+    Pipeline make() { return Pipeline(source, mapper, finder, scanner); }
+
+    Pipeline::ParallelConfig base_cfg() {
+        Pipeline::ParallelConfig c;
+        c.chunk_size     = 64;
+        c.digit_threads  = 1;
+        c.mapper_threads = 1;
+        c.finder_threads = 1;
+        c.scanner_threads = 1;
+        return c;
+    }
+};
+}  // namespace
+
+TEST(ParallelPipeline, WritesLetterFileWhenEnabled) {
+    ParallelLetterFixture fix;
+    auto cfg = fix.base_cfg();
+    cfg.write_letters = true;
+    fix.make().run_parallel(fix.run_dir, cfg);
+    EXPECT_TRUE(std::filesystem::exists(fix.run_dir / "letter_sequence.txt"));
+}
+
+TEST(ParallelPipeline, SkipsLetterFileWhenDisabled) {
+    ParallelLetterFixture fix;
+    fix.make().run_parallel(fix.run_dir, fix.base_cfg());
+    EXPECT_FALSE(std::filesystem::exists(fix.run_dir / "letter_sequence.txt"));
+}
+
+TEST(ParallelPipeline, LettersFileContainsExpectedContent) {
+    ParallelLetterFixture fix;
+    auto cfg = fix.base_cfg();
+    cfg.write_letters = true;
+    fix.make().run_parallel(fix.run_dir, cfg);
+
+    std::ifstream f(fix.run_dir / "letter_sequence.txt");
+    ASSERT_TRUE(f.is_open());
+    std::string contents((std::istreambuf_iterator<char>(f)),
+                          std::istreambuf_iterator<char>());
+    EXPECT_EQ(contents, "fphab\n");
+}
+
+TEST(ParallelPipeline, LettersFileContainsExpectedContent_MultiChunk) {
+    ParallelLetterFixture fix;
+    auto cfg = fix.base_cfg();
+    cfg.write_letters = true;
+    cfg.chunk_size    = 4;  // 2 chars per chunk × 5 chunks exercises reorder path
+    fix.make().run_parallel(fix.run_dir, cfg);
+
+    std::ifstream f(fix.run_dir / "letter_sequence.txt");
+    ASSERT_TRUE(f.is_open());
+    std::string contents((std::istreambuf_iterator<char>(f)),
+                          std::istreambuf_iterator<char>());
+    EXPECT_EQ(contents, "fphab\n");
+}
+
 // ── AllCombos parallel matches serial (set-equality) ─────────────────────────
 
 TEST(ParallelPipeline, ParallelMatchesSerial_AllCombos) {
