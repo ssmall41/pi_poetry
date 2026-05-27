@@ -29,6 +29,10 @@ struct ComboPackage {
     std::size_t intra_chunk_seq_id{0};
     bool        final_package_in_chunk{false};
     std::vector<WordMatch> chain;
+    // Non-empty only on final_package_in_chunk when write_letters is enabled.
+    // Contains real chars only (no lookahead); size == num_real_letter_chars.
+    std::vector<char> letter_chars;
+    std::size_t       num_real_letter_chars{0};
 };
 
 struct PhrasePackage {
@@ -36,4 +40,6 @@ struct PhrasePackage {
     std::size_t intra_chunk_seq_id{0};
     bool        final_package_in_chunk{false};
     std::vector<std::string> json_strs;  // one JSON object per phrase, no comma/newline
+    std::vector<char> letter_chars;
+    std::size_t       num_real_letter_chars{0};
 };
