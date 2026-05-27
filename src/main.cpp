@@ -57,6 +57,13 @@ int main(int argc, char* argv[]) {
             run_dir = std::filesystem::path(out_dir) / ("run-" + std::string(buf));
             std::filesystem::create_directories(run_dir);
             std::cout << "Run output: " << run_dir.string() << "\n";
+            auto config_dest = run_dir / std::filesystem::path(config_path).filename();
+            try {
+                std::filesystem::copy_file(config_path, config_dest);
+            } catch (const std::filesystem::filesystem_error& e) {
+                std::cerr << "Error copying config: " << e.what() << "\n";
+                return 1;
+            }
         }
 
         std::string policy_str = config["word_finder"]["overlap_policy"].value_or(
