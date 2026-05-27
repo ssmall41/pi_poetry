@@ -17,9 +17,8 @@ TEST(AhoCorasickCPU, EmptyDictionaryNoMatches) {
     AhoCorasickCPU ac;
     ac.build();
     auto r = do_scan(ac, "helloworld");
-    // ETL with no matches: one empty sequence
-    ASSERT_EQ(r.size(), 1u);
-    EXPECT_TRUE(r[0].empty());
+    // ETL with no matches: empty outer vector (symmetric with AllCombos)
+    EXPECT_TRUE(r.empty());
 }
 
 TEST(AhoCorasickCPU, SingleWordFound) {
@@ -301,6 +300,88 @@ TEST(AhoCorasickCPU, ScanChunkNonLetterResetsState) {
     ac.scan_chunk("nd", 2, 2, state, raw);
 
     EXPECT_TRUE(raw.empty());
+}
+
+TEST(AhoCorasickCPU, EtlCallbackEquivalence) {
+    // apply_etl_cb must emit the same chain as scan() with ETL policy.
+    AhoCorasickCPU ac;
+    for (auto w : {"a", "ab", "b"}) ac.insert_word(w);
+    ac.build();
+    // ETL is default policy; no set_overlap_policy needed
+
+    // Collect via return-value scan()
+    auto seqs = ac.scan("ab", 2, 0);
+
+    // Collect via scan_chunk + apply_etl_cb
+    int state = 0;
+    RawVec raw;
+    ac.scan_chunk("ab", 2, 0, state, raw);
+
+    std::vector<std::vector<WordMatch>> cb_chains;
+    ac.apply_etl_cb(raw, 0,
+        [&](const std::vector<WordMatch>& chain) { cb_chains.push_back(chain); });
+
+    auto to_word_lists = [](const std::vector<std::vector<WordMatch>>& chains) {
+        std::vector<std::vector<std::string>> result;
+        for (const auto& chain : chains) {
+            std::vector<std::string> words;
+            for (const auto& m : chain) words.push_back(m.word);
+            result.push_back(words);
+        }
+        std::sort(result.begin(), result.end());
+        return result;
+    };
+
+    ASSERT_EQ(seqs.size(), cb_chains.size());
+    EXPECT_EQ(to_word_lists(seqs), to_word_lists(cb_chains));
+}
+
+TEST(AhoCorasickCPU, EtlCallbackNoMatchesCallsOnChainZeroTimes) {
+    AhoCorasickCPU ac;
+    ac.insert_word("cat");
+    ac.build();
+
+    int state = 0;
+    RawVec raw;
+    ac.scan_chunk("xyz", 3, 0, state, raw);
+
+    int call_count = 0;
+    ac.apply_etl_cb(raw, 0,
+        [&](const std::vector<WordMatch>&) { ++call_count; });
+
+    EXPECT_EQ(call_count, 0);
+}
+
+TEST(AhoCorasickCPU, EtlIsSubsetOfAllCombos) {
+    AhoCorasickCPU ac;
+    for (auto w : {"s", "sword", "swords", "word", "words"}) ac.insert_word(w);
+    ac.build();
+
+    int state = 0;
+    RawVec raw;
+    ac.scan_chunk("swords", 6, 0, state, raw);
+
+    // Collect ETL chains (at most 1)
+    std::vector<std::vector<std::string>> etl_word_lists;
+    ac.apply_etl_cb(raw, 0, [&](const std::vector<WordMatch>& chain) {
+        std::vector<std::string> words;
+        for (const auto& m : chain) words.push_back(m.word);
+        etl_word_lists.push_back(words);
+    });
+
+    // Collect AllCombos chains
+    std::vector<std::vector<std::string>> ac_word_lists;
+    ac.apply_all_combos_cb(raw, 0, [&](const std::vector<WordMatch>& chain) {
+        std::vector<std::string> words;
+        for (const auto& m : chain) words.push_back(m.word);
+        ac_word_lists.push_back(words);
+    });
+
+    // Every ETL chain must appear in AllCombos
+    for (const auto& etl_chain : etl_word_lists) {
+        EXPECT_TRUE(std::find(ac_word_lists.begin(), ac_word_lists.end(), etl_chain) != ac_word_lists.end())
+            << "ETL chain not found in AllCombos output";
+    }
 }
 
 TEST(AhoCorasickCPU, AllCombosCallbackEquivalence) {

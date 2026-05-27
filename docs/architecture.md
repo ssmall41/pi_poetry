@@ -157,8 +157,9 @@ struct WordMatch {
 | `load_dictionary(path)` | Load word list (one word per line); respects `min_word_length`. |
 | `build()` | Construct the automaton; must be called after loading the dictionary. |
 | `scan_chunk(chunk, len, offset, state, raw_out)` | Stateful incremental scan; `state` carries the automaton node between calls. |
-| `apply_etl(raw)` | Apply `EarliestThenLongest` to a raw match list. |
-| `apply_all_combos_cb(raw, offset, on_chain)` | Enumerate all chains, invoking `on_chain` for each. |
+| `apply_etl_cb(raw, offset, on_chain)` | Apply `EarliestThenLongest`; calls `on_chain` 0–1 times (0 when no matches). |
+| `apply_all_combos_cb(raw, offset, on_chain)` | Enumerate all chains; calls `on_chain` 0–N times. |
+| `apply_policy_cb(raw, offset, on_chain)` | Dispatch to `apply_etl_cb` or `apply_all_combos_cb` based on the configured policy. |
 | `set_min_word_length(n)` | Filter out short words before building the automaton. |
 
 ---
