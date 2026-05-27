@@ -19,7 +19,7 @@ Supply a plain-text file of pi digits (one ASCII digit per byte) at `data/pi_dig
 ./build/pi_poetry --config config/default.toml
 ```
 
-Each run creates a timestamped subfolder (e.g. `outputs/run-20260506_143022/`) containing `results.txt` and `results.json`. If `write_letter_sequence = true` in the `[digit_mapper]` config, `letter_sequence.txt` is also written. The output directory is configurable in `config/default.toml`.
+Each run creates a timestamped subfolder (e.g. `outputs/run-20260506_143022/`) containing `results.json`. If `write_letter_sequence = true` in the `[digit_mapper]` config, `letter_sequence.txt` is also written. The output directory is configurable in `config/default.toml`.
 
 ## Running Tests
 

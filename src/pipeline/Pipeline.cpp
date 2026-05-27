@@ -89,11 +89,6 @@ void Pipeline::run(const std::filesystem::path& run_dir, bool write_letter_seque
     if (write_letter_sequence)
         letters_out.put('\n');
 
-    std::ofstream txt_out(run_dir / "results.txt");
-    if (!txt_out)
-        throw std::runtime_error("Cannot open output file: " +
-                                 (run_dir / "results.txt").string());
-
     std::ofstream json_out(run_dir / "results.json");
     if (!json_out)
         throw std::runtime_error("Cannot open output file: " +
@@ -103,7 +98,6 @@ void Pipeline::run(const std::filesystem::path& run_dir, bool write_letter_seque
     bool first_json = true;
 
     auto on_phrase = [&](PhraseMatch p) {
-        HumanReviewScanner::write_text_phrase(txt_out, p);
         if (!first_json) json_out << ',';
         json_out << '\n';
         HumanReviewScanner::write_json_phrase(json_out, p);
@@ -228,13 +222,10 @@ public:
         out.intra_chunk_seq_id     = pkg.intra_chunk_seq_id;
         out.final_package_in_chunk = pkg.final_package_in_chunk;
         auto phrases = scanner_.process_words(pkg.chain);
-        out.text_strs.reserve(phrases.size());
         out.json_strs.reserve(phrases.size());
         for (const auto& p : phrases) {
-            std::ostringstream t, j;
-            HumanReviewScanner::write_text_phrase(t, p);
+            std::ostringstream j;
             HumanReviewScanner::write_json_phrase(j, p);
-            out.text_strs.push_back(t.str());
             out.json_strs.push_back(j.str());
         }
         emit(std::move(out));
@@ -324,11 +315,7 @@ void Pipeline::run_parallel(const std::filesystem::path& run_dir,
     scanner_runner.start();
 
     // ── Writer thread: reorder buffer → disk ─────────────────────────────────
-    const std::string txt_path  = cfg.dry_run ? "/dev/null" : (run_dir / "results.txt").string();
     const std::string json_path = cfg.dry_run ? "/dev/null" : (run_dir / "results.json").string();
-    std::ofstream txt_out(txt_path);
-    if (!txt_out)
-        throw std::runtime_error("Cannot open output file: " + txt_path);
     std::ofstream json_out(json_path);
     if (!json_out)
         throw std::runtime_error("Cannot open output file: " + json_path);
@@ -343,8 +330,7 @@ void Pipeline::run_parallel(const std::filesystem::path& run_dir,
             reorder.submit(pp.chunk_id, pp.intra_chunk_seq_id,
                            pp.final_package_in_chunk, std::move(pp));
             reorder.drain([&](PhrasePackage& p) {
-                for (std::size_t i = 0; i < p.text_strs.size(); ++i) {
-                    txt_out << p.text_strs[i];
+                for (std::size_t i = 0; i < p.json_strs.size(); ++i) {
                     if (!first_json) json_out << ',';
                     json_out << '\n' << p.json_strs[i];
                     first_json = false;
@@ -352,8 +338,7 @@ void Pipeline::run_parallel(const std::filesystem::path& run_dir,
             });
         }
         reorder.drain_all([&](PhrasePackage& p) {
-            for (std::size_t i = 0; i < p.text_strs.size(); ++i) {
-                txt_out << p.text_strs[i];
+            for (std::size_t i = 0; i < p.json_strs.size(); ++i) {
                 if (!first_json) json_out << ',';
                 json_out << '\n' << p.json_strs[i];
                 first_json = false;

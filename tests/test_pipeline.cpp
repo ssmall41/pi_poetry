@@ -41,13 +41,13 @@ struct PipelineFixture {
 
 }  // namespace
 
-// --- Tracer bullet: results.txt appears in run_dir ---
+// --- Tracer bullet: results.json appears in run_dir ---
 
-TEST(Pipeline_RunDir, WritesTextFileInRunDir) {
+TEST(Pipeline_RunDir, WritesJsonFileInRunDir) {
     PipelineFixture fix;
     auto pipeline = fix.make();
     pipeline.run(fix.run_dir);
-    EXPECT_TRUE(std::filesystem::exists(fix.run_dir / "results.txt"));
+    EXPECT_TRUE(std::filesystem::exists(fix.run_dir / "results.json"));
 }
 
 // --- Letter file: written when enabled, skipped when disabled ---
@@ -56,7 +56,6 @@ TEST(Pipeline_RunDir, WritesLetterFileWhenEnabled) {
     PipelineFixture fix;
     auto pipeline = fix.make();
     pipeline.run(fix.run_dir, true);
-    EXPECT_TRUE(std::filesystem::exists(fix.run_dir / "results.txt"));
     EXPECT_TRUE(std::filesystem::exists(fix.run_dir / "results.json"));
     EXPECT_TRUE(std::filesystem::exists(fix.run_dir / "letter_sequence.txt"));
 }
@@ -107,19 +106,24 @@ TEST(Pipeline_AllCombos, ProducesAllSequencesInResults) {
     Pipeline pipeline(source, mapper, finder, scanner);
     pipeline.run(run_dir);
 
-    std::ifstream f(run_dir / "results.txt");
+    std::ifstream f(run_dir / "results.json");
     ASSERT_TRUE(f.is_open());
-    std::string contents((std::istreambuf_iterator<char>(f)),
-                          std::istreambuf_iterator<char>());
+    auto j = nlohmann::json::parse(f);
     std::filesystem::remove_all(run_dir);
 
-    EXPECT_NE(contents.find("Offset 0: ab\n"),      std::string::npos);
-    EXPECT_NE(contents.find("Offset 0: a b"),        std::string::npos);
-    EXPECT_NE(contents.find("Offset 1: b\n"),        std::string::npos);
-
-    int lines = 0;
-    for (char c : contents) if (c == '\n') ++lines;
-    EXPECT_GT(lines, 1);
+    const auto& phrases = j["phrases"];
+    auto has_phrase = [&](std::size_t offset, std::vector<std::string> words) {
+        for (const auto& p : phrases) {
+            if (p["start_offset"].get<std::size_t>() == offset &&
+                p["words"].get<std::vector<std::string>>() == words)
+                return true;
+        }
+        return false;
+    };
+    EXPECT_TRUE(has_phrase(0, {"ab"}));
+    EXPECT_TRUE(has_phrase(0, {"a", "b"}));
+    EXPECT_TRUE(has_phrase(1, {"b"}));
+    EXPECT_GT(phrases.size(), 1u);
 }
 
 TEST(Pipeline_AllCombos, SortsByOffsetThenFirstWord) {
@@ -142,37 +146,38 @@ TEST(Pipeline_AllCombos, SortsByOffsetThenFirstWord) {
     Pipeline pipeline(source, mapper, finder, scanner);
     pipeline.run(run_dir);
 
-    std::ifstream f(run_dir / "results.txt");
+    std::ifstream f(run_dir / "results.json");
     ASSERT_TRUE(f.is_open());
-    std::vector<std::string> lines;
-    std::string line;
-    while (std::getline(f, line)) if (!line.empty()) lines.push_back(line);
+    auto j = nlohmann::json::parse(f);
     std::filesystem::remove_all(run_dir);
 
-    ASSERT_GE(lines.size(), 3u);
+    const auto& phrases = j["phrases"];
+    ASSERT_GE(phrases.size(), 3u);
 
-    // All Offset-0 lines come before Offset-1 lines
-    auto last_offset0 = std::string::npos;
-    auto first_offset1 = std::string::npos;
-    for (std::size_t i = 0; i < lines.size(); ++i) {
-        if (lines[i].find("Offset 0:") != std::string::npos) last_offset0 = i;
-        if (first_offset1 == std::string::npos &&
-            lines[i].find("Offset 1:") != std::string::npos) first_offset1 = i;
+    // All offset-0 phrases come before offset-1 phrases
+    std::size_t last_offset0 = std::string::npos;
+    std::size_t first_offset1 = std::string::npos;
+    for (std::size_t i = 0; i < phrases.size(); ++i) {
+        auto off = phrases[i]["start_offset"].get<std::size_t>();
+        if (off == 0) last_offset0 = i;
+        if (first_offset1 == std::string::npos && off == 1) first_offset1 = i;
     }
     if (last_offset0 != std::string::npos && first_offset1 != std::string::npos) {
         EXPECT_LT(last_offset0, first_offset1);
     }
 
-    // Within offset 0: line "Offset 0: a ..." appears before "Offset 0: ab"
-    std::size_t line_a  = std::string::npos;
-    std::size_t line_ab = std::string::npos;
-    for (std::size_t i = 0; i < lines.size(); ++i) {
-        if (lines[i].find("Offset 0: a ") != std::string::npos && line_a == std::string::npos)
-            line_a = i;
-        if (lines[i] == "Offset 0: ab") line_ab = i;
+    // Within offset 0: phrase with first word "a" appears before phrase with first word "ab"
+    std::size_t idx_a = std::string::npos, idx_ab = std::string::npos;
+    for (std::size_t i = 0; i < phrases.size(); ++i) {
+        if (phrases[i]["start_offset"].get<std::size_t>() != 0) continue;
+        const auto& words = phrases[i]["words"];
+        if (!words.empty() && words[0].get<std::string>() == "a" && idx_a == std::string::npos)
+            idx_a = i;
+        if (!words.empty() && words[0].get<std::string>() == "ab")
+            idx_ab = i;
     }
-    if (line_a != std::string::npos && line_ab != std::string::npos) {
-        EXPECT_LT(line_a, line_ab);
+    if (idx_a != std::string::npos && idx_ab != std::string::npos) {
+        EXPECT_LT(idx_a, idx_ab);
     }
 }
 
@@ -238,10 +243,10 @@ TEST(Pipeline_OverlapPolicy, ETLPhrasesAreSubsetOfAllCombos) {
 // ── Streaming refactor: output identical to old pipeline ────────────────────
 
 TEST(Pipeline_Streaming, SmallInputETLOutputMatchesBaseline) {
-    // Verify the chunked-streaming pipeline produces the same results.txt as
+    // Verify the chunked-streaming pipeline produces the same results.json as
     // the original bulk pipeline on a tiny deterministic input.
     // "3141592653" → TwoDigitBlockMapper → "fphab"
-    // No dictionary words → results.txt is empty.
+    // No dictionary words → results.json has empty phrases array.
     auto digit_file = make_temp_digit_file("3141592653");
     auto run_dir    = std::filesystem::temp_directory_path() / "pi_streaming_etl_test";
     std::filesystem::create_directories(run_dir);
@@ -256,13 +261,12 @@ TEST(Pipeline_Streaming, SmallInputETLOutputMatchesBaseline) {
     Pipeline pipeline(source, mapper, finder, scanner);
     pipeline.run(run_dir, false, 4);  // chunk_size=4 (tiny, forces multiple chunks)
 
-    std::ifstream f(run_dir / "results.txt");
+    std::ifstream f(run_dir / "results.json");
     ASSERT_TRUE(f.is_open());
-    std::string contents((std::istreambuf_iterator<char>(f)),
-                          std::istreambuf_iterator<char>());
+    auto j = nlohmann::json::parse(f);
     std::filesystem::remove_all(run_dir);
     std::filesystem::remove(digit_file);
-    EXPECT_TRUE(contents.empty());
+    EXPECT_TRUE(j["phrases"].empty());
 }
 
 TEST(Pipeline_Streaming, WordSpanningChunkBoundaryIsFound) {
@@ -284,13 +288,16 @@ TEST(Pipeline_Streaming, WordSpanningChunkBoundaryIsFound) {
     Pipeline pipeline(source, mapper, finder, scanner);
     pipeline.run(run_dir, false, 2);  // chunk_size=2 digits = 1 char/chunk
 
-    std::ifstream f(run_dir / "results.txt");
+    std::ifstream f(run_dir / "results.json");
     ASSERT_TRUE(f.is_open());
-    std::string contents((std::istreambuf_iterator<char>(f)),
-                          std::istreambuf_iterator<char>());
+    auto j = nlohmann::json::parse(f);
     std::filesystem::remove_all(run_dir);
     std::filesystem::remove(digit_file);
-    EXPECT_NE(contents.find("abc"), std::string::npos);
+    bool found_abc = false;
+    for (const auto& p : j["phrases"])
+        for (const auto& w : p["words"])
+            if (w.get<std::string>() == "abc") found_abc = true;
+    EXPECT_TRUE(found_abc);
 }
 
 // ── Pipeline + analysis integration ──────────────────────────────────────────

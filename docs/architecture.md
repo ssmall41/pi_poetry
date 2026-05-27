@@ -41,7 +41,7 @@ Pi Poetry searches the decimal expansion of π for sequences of English words en
 └─────────────────────┘
         │
         ▼
-  results.txt / results.json
+  results.json
 ```
 
 ---
@@ -324,12 +324,12 @@ Word scanning is CPU-bound and typically the most expensive stage, so `finder_th
 
 **Count:** `phrase_scanner.threads` (default 1)
 
-Each worker pops a `ComboPackage` from `combo_q`, calls `HumanReviewScanner::process_words()` to group the word chain into phrases, then immediately serializes each phrase to its text and JSON string representations using `write_text_phrase` and `write_json_phrase`. The pre-built strings are stored in the `PhrasePackage` fields `text_strs` and `json_strs`. Like the mapper, each package is independent, so this stage scales linearly with thread count. The last active scanner calls `phrase_q.set_done()`.
+Each worker pops a `ComboPackage` from `combo_q`, calls `HumanReviewScanner::process_words()` to group the word chain into phrases, then immediately serializes each phrase to its JSON string representation using `write_json_phrase`. The pre-built strings are stored in the `PhrasePackage` field `json_strs`. Like the mapper, each package is independent, so this stage scales linearly with thread count. The last active scanner calls `phrase_q.set_done()`.
 
 ### Writer Thread (always 1)
 
-The writer thread pops `PhrasePackage` items from `phrase_q` and submits each one to a `ReorderBuffer`. The `ReorderBuffer` holds packages until all prior chunks (by `chunk_id` and `intra_chunk_seq_id`) have arrived, then drains them in order — ensuring that `results.txt` and `results.json` are written in the same offset order as a serial run, regardless of which worker processed which chunk first.
+The writer thread pops `PhrasePackage` items from `phrase_q` and submits each one to a `ReorderBuffer`. The `ReorderBuffer` holds packages until all prior chunks (by `chunk_id` and `intra_chunk_seq_id`) have arrived, then drains them in order — ensuring that `results.json` is written in the same offset order as a serial run, regardless of which worker processed which chunk first.
 
-Because phrases arrive pre-serialized in `text_strs` and `json_strs`, the writer only concatenates strings to the output streams; it performs no phrase formatting or JSON construction itself.
+Because phrases arrive pre-serialized in `json_strs`, the writer only concatenates strings to the output stream; it performs no phrase formatting or JSON construction itself.
 
 Only one writer thread exists because disk writes must be serialized and because the `ReorderBuffer` is inherently sequential.

@@ -1,6 +1,5 @@
 #include "phrase_scanner/HumanReviewScanner.hpp"
 #include <algorithm>
-#include <fstream>
 #include <iostream>
 #include <nlohmann/json.hpp>
 
@@ -87,20 +86,6 @@ void HumanReviewScanner::flush_streaming(
     }
 }
 
-void HumanReviewScanner::write_text_phrase(std::ostream& out, const PhraseMatch& p) {
-    out << "Offset " << p.start_offset << ": ";
-    for (std::size_t i = 0; i < p.words.size(); ++i) {
-        if (i > 0) out << ' ';
-        out << p.words[i];
-    }
-    if (!p.gap_sizes.empty()) {
-        out << " [gaps:";
-        for (int g : p.gap_sizes) out << ' ' << g;
-        out << ']';
-    }
-    out << '\n';
-}
-
 void HumanReviewScanner::write_json_phrase(std::ostream& out, const PhraseMatch& p) {
     out << "{\"start_offset\":" << p.start_offset << ",\"words\":[";
     for (std::size_t i = 0; i < p.words.size(); ++i) {
@@ -113,11 +98,6 @@ void HumanReviewScanner::write_json_phrase(std::ostream& out, const PhraseMatch&
         out << p.gap_sizes[i];
     }
     out << "]}";
-}
-
-void HumanReviewScanner::write_text(const std::vector<PhraseMatch>& phrases,
-                                    std::ostream& out) const {
-    for (const auto& p : phrases) write_text_phrase(out, p);
 }
 
 void HumanReviewScanner::write_json(const std::vector<PhraseMatch>& phrases,
@@ -134,18 +114,3 @@ void HumanReviewScanner::write_json(const std::vector<PhraseMatch>& phrases,
     out << j.dump(2) << '\n';
 }
 
-void HumanReviewScanner::write_results(const std::vector<PhraseMatch>& phrases,
-                                       const std::filesystem::path& run_dir) const {
-    {
-        auto p = run_dir / "results.txt";
-        std::ofstream f(p);
-        if (!f) throw std::runtime_error("Cannot open output file: " + p.string());
-        write_text(phrases, f);
-    }
-    {
-        auto p = run_dir / "results.json";
-        std::ofstream f(p);
-        if (!f) throw std::runtime_error("Cannot open output file: " + p.string());
-        write_json(phrases, f);
-    }
-}

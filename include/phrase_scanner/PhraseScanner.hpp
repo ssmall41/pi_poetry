@@ -25,7 +25,4 @@ public:
         const std::vector<WordMatch>& word_stream) = 0;
 
     virtual void set_gap_policy(GapPolicy policy) = 0;
-
-    virtual void write_results(const std::vector<PhraseMatch>& phrases,
-                               const std::filesystem::path& run_dir) const = 0;
 };
