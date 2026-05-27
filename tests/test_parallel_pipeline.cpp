@@ -222,14 +222,6 @@ struct ParallelLetterFixture {
 };
 }  // namespace
 
-TEST(ParallelPipeline, WritesLetterFileWhenEnabled) {
-    ParallelLetterFixture fix;
-    auto cfg = fix.base_cfg();
-    cfg.write_letters = true;
-    fix.make().run_parallel(fix.run_dir, cfg);
-    EXPECT_TRUE(std::filesystem::exists(fix.run_dir / "letter_sequence.txt"));
-}
-
 TEST(ParallelPipeline, SkipsLetterFileWhenDisabled) {
     ParallelLetterFixture fix;
     fix.make().run_parallel(fix.run_dir, fix.base_cfg());

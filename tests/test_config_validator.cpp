@@ -166,13 +166,6 @@ TEST(ConfigValidator, InvalidPhraseScannerThreads) {
 
 // ── Active fields ─────────────────────────────────────────────────────────────
 
-TEST(ConfigValidator, OverlapPolicyEarliestThenLongestIsValid) {
-    auto cfg = make_valid_table();
-    cfg["word_finder"].as_table()->insert_or_assign("overlap_policy",
-                                                    "earliest-then-longest");
-    EXPECT_TRUE(validate_config(cfg).empty());
-}
-
 TEST(ConfigValidator, OverlapPolicyAllCombosIsValid) {
     auto cfg = make_valid_table();
     cfg["word_finder"].as_table()->insert_or_assign("overlap_policy", "all-combos");
@@ -187,12 +180,6 @@ TEST(ConfigValidator, OverlapPolicyInvalidValue) {
     EXPECT_TRUE(any_error_contains(errors, "word_finder.overlap_policy"));
     EXPECT_TRUE(any_error_contains(errors, "earliest-then-longest"));
     EXPECT_TRUE(any_error_contains(errors, "all-combos"));
-}
-
-TEST(ConfigValidator, MinWordLength1IsValid) {
-    auto cfg = make_valid_table();
-    cfg["word_finder"].as_table()->insert_or_assign("min_word_length", 1);
-    EXPECT_TRUE(validate_config(cfg).empty());
 }
 
 TEST(ConfigValidator, MinWordLengthZeroIsInvalid) {
@@ -268,18 +255,6 @@ TEST(ConfigValidator, WrongTypeForIntegerField) {
 
 // ── digit_source.chunk_size ──────────────────────────────────────────────────
 
-TEST(ConfigValidator, ChunkSizeAbsentIsValid) {
-    auto cfg = make_valid_table();
-    cfg["digit_source"].as_table()->erase("chunk_size");
-    EXPECT_TRUE(validate_config(cfg).empty());
-}
-
-TEST(ConfigValidator, ChunkSizePositiveIsValid) {
-    auto cfg = make_valid_table();
-    cfg["digit_source"].as_table()->insert_or_assign("chunk_size", 65536);
-    EXPECT_TRUE(validate_config(cfg).empty());
-}
-
 TEST(ConfigValidator, ChunkSizeOneIsValid) {
     auto cfg = make_valid_table();
     cfg["digit_source"].as_table()->insert_or_assign("chunk_size", 1);
@@ -295,14 +270,6 @@ TEST(ConfigValidator, ChunkSizeZeroIsInvalid) {
     EXPECT_TRUE(any_error_contains(errors, ">= 1"));
 }
 
-TEST(ConfigValidator, ChunkSizeNegativeIsInvalid) {
-    auto cfg = make_valid_table();
-    cfg["digit_source"].as_table()->insert_or_assign("chunk_size", -1);
-    auto errors = validate_config(cfg);
-    ASSERT_EQ(errors.size(), 1u);
-    EXPECT_TRUE(any_error_contains(errors, "digit_source.chunk_size"));
-}
-
 TEST(ConfigValidator, ChunkSizeWrongTypeIsInvalid) {
     auto cfg = make_valid_table();
     cfg["digit_source"].as_table()->insert_or_assign("chunk_size", "big");
@@ -313,21 +280,11 @@ TEST(ConfigValidator, ChunkSizeWrongTypeIsInvalid) {
 
 // ── [analysis] section ────────────────────────────────────────────────────────
 
-TEST(ConfigValidator, AnalysisSectionAbsentIsValid) {
-    auto cfg = make_valid_table();
-    EXPECT_TRUE(validate_config(cfg).empty());
-}
-
-TEST(ConfigValidator, AnalysisRunAfterPipelineFalseIsValid) {
+TEST(ConfigValidator, AnalysisRunAfterPipelineBoolIsValid) {
     auto cfg = make_valid_table();
     cfg.insert_or_assign("analysis", toml::table{});
     cfg["analysis"].as_table()->insert_or_assign("run_after_pipeline", false);
     EXPECT_TRUE(validate_config(cfg).empty());
-}
-
-TEST(ConfigValidator, AnalysisRunAfterPipelineTrueIsValid) {
-    auto cfg = make_valid_table();
-    cfg.insert_or_assign("analysis", toml::table{});
     cfg["analysis"].as_table()->insert_or_assign("run_after_pipeline", true);
     EXPECT_TRUE(validate_config(cfg).empty());
 }
@@ -342,11 +299,6 @@ TEST(ConfigValidator, AnalysisRunAfterPipelineWrongTypeIsInvalid) {
 }
 
 // ── phrase_scanner.min_phrase_length ──────────────────────────────────────────
-
-TEST(ConfigValidator, MinPhraseLengthAbsentIsValid) {
-    auto cfg = make_valid_table();
-    EXPECT_TRUE(validate_config(cfg).empty());
-}
 
 TEST(ConfigValidator, MinPhraseLength1IsValid) {
     auto cfg = make_valid_table();

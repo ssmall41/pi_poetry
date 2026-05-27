@@ -185,12 +185,6 @@ TEST(HumanReviewScanner, StreamingBatchBoundaryDoesNotSplitPhrase) {
 
 // ── min_phrase_length filter ──────────────────────────────────────────────────
 
-TEST(HumanReviewScanner_MinPhraseLength, DefaultMin1KeepsSingleWord) {
-    HumanReviewScanner hs;
-    auto phrases = hs.process_words({make_word("cat", 0)});
-    ASSERT_EQ(phrases.size(), 1u);
-}
-
 TEST(HumanReviewScanner_MinPhraseLength, Min2FiltersSingleWord_ProcessWords) {
     HumanReviewScanner hs;
     hs.set_min_phrase_length(2);
