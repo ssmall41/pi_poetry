@@ -109,13 +109,8 @@ void Pipeline::run(const std::filesystem::path& run_dir, bool write_letter_seque
         hs->flush_streaming(on_phrase);
     };
 
-    if (ac->get_overlap_policy() == OverlapPolicy::AllCombos) {
-        ac->apply_all_combos_cb(raw_global, 0,
-            [&](const std::vector<WordMatch>& chain) { emit_sequence(chain); });
-    } else {
-        auto etl_result = ac->apply_etl(raw_global);
-        emit_sequence(etl_result);
-    }
+    ac->apply_policy_cb(raw_global, 0,
+        [&](const std::vector<WordMatch>& chain) { emit_sequence(chain); });
 
     json_out << "\n  ]\n}\n";
 }
@@ -176,34 +171,26 @@ public:
 
         const std::size_t chunk_id = pkg.seq_id;
 
-        if (ac_.get_overlap_policy() == OverlapPolicy::AllCombos) {
-            std::vector<ComboPackage> pending;
-            std::size_t intra = 0;
-            ac_.apply_all_combos_cb(raw, 0, [&](const std::vector<WordMatch>& chain) {
-                ComboPackage cp;
-                cp.chunk_id               = chunk_id;
-                cp.intra_chunk_seq_id     = intra++;
-                cp.final_package_in_chunk = false;
-                cp.chain                  = chain;
-                pending.push_back(std::move(cp));
-            });
-            if (pending.empty()) {
-                ComboPackage cp;
-                cp.chunk_id               = chunk_id;
-                cp.intra_chunk_seq_id     = 0;
-                cp.final_package_in_chunk = true;
-                emit(std::move(cp));
-            } else {
-                pending.back().final_package_in_chunk = true;
-                for (auto& cp : pending) emit(std::move(cp));
-            }
-        } else {
+        std::vector<ComboPackage> pending;
+        std::size_t intra = 0;
+        ac_.apply_policy_cb(raw, 0, [&](const std::vector<WordMatch>& chain) {
+            ComboPackage cp;
+            cp.chunk_id               = chunk_id;
+            cp.intra_chunk_seq_id     = intra++;
+            cp.final_package_in_chunk = false;
+            cp.chain                  = chain;
+            pending.push_back(std::move(cp));
+        });
+        // pending.empty() is only reachable for AllCombos with zero matches
+        if (pending.empty()) {
             ComboPackage cp;
             cp.chunk_id               = chunk_id;
             cp.intra_chunk_seq_id     = 0;
             cp.final_package_in_chunk = true;
-            cp.chain                  = ac_.apply_etl(raw);
             emit(std::move(cp));
+        } else {
+            pending.back().final_package_in_chunk = true;
+            for (auto& cp : pending) emit(std::move(cp));
         }
     }
 

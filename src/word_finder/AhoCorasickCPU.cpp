@@ -108,39 +108,10 @@ std::vector<std::vector<WordMatch>> AhoCorasickCPU::scan(const char* char_buffer
         }
     }
 
-    if (policy_ == OverlapPolicy::AllCombos)
-        return apply_all_combos(raw, offset);
-    return apply_earliest_then_longest(raw, offset);
-}
-
-std::vector<std::vector<WordMatch>> AhoCorasickCPU::apply_earliest_then_longest(
-    std::vector<std::pair<std::size_t, std::string>>& raw,
-    std::size_t global_offset) {
-
-    // Sort by start position ascending, then length descending
-    std::sort(raw.begin(), raw.end(),
-              [](const auto& a, const auto& b) {
-                  if (a.first != b.first)
-                      return a.first < b.first;
-                  return a.second.size() > b.second.size();
-              });
-
-    std::vector<WordMatch> result;
-    std::size_t scan_pos  = 0;
-    std::size_t prev_end  = 0;
-
-    for (auto& [local_start, word] : raw) {
-        if (local_start < scan_pos) continue;
-
-        std::size_t global_start = global_offset + local_start;
-        bool consecutive = !result.empty() && (global_start == prev_end);
-        result.push_back({word, global_start, word.size(), consecutive});
-
-        scan_pos = local_start + word.size();
-        prev_end = global_start + word.size();
-    }
-
-    return { result };
+    std::vector<std::vector<WordMatch>> result;
+    apply_policy_cb(raw, offset,
+        [&](const std::vector<WordMatch>& chain) { result.push_back(chain); });
+    return result;
 }
 
 void AhoCorasickCPU::scan_chunk(const char* chunk, std::size_t len,
@@ -196,18 +167,39 @@ void AhoCorasickCPU::apply_all_combos_cb(
     }
 }
 
-std::vector<WordMatch> AhoCorasickCPU::apply_etl(
-    std::vector<std::pair<std::size_t, std::string>>& raw) {
-    auto seqs = apply_earliest_then_longest(raw, 0);
-    return seqs.empty() ? std::vector<WordMatch>{} : std::move(seqs[0]);
-}
-
-std::vector<std::vector<WordMatch>> AhoCorasickCPU::apply_all_combos(
+void AhoCorasickCPU::apply_etl_cb(
     const std::vector<std::pair<std::size_t, std::string>>& raw,
-    std::size_t global_offset) {
+    std::size_t global_offset,
+    const std::function<void(const std::vector<WordMatch>&)>& on_chain) const {
 
-    std::vector<std::vector<WordMatch>> result;
-    apply_all_combos_cb(raw, global_offset,
-        [&](const std::vector<WordMatch>& chain) { result.push_back(chain); });
-    return result;
+    // Build map: start position → (longest word at that start, end position)
+    std::map<std::size_t, std::pair<std::string, std::size_t>> best;
+    for (const auto& [start, word] : raw) {
+        auto it = best.find(start);
+        if (it == best.end() || word.size() > it->second.first.size())
+            best[start] = {word, start + word.size()};
+    }
+
+    std::vector<WordMatch> result;
+    std::size_t scan_pos = 0, prev_end = 0;
+    for (const auto& [start, word_end] : best) {
+        if (start < scan_pos) continue;
+        std::size_t global_start = global_offset + start;
+        bool consecutive = !result.empty() && (global_start == prev_end);
+        result.push_back({word_end.first, global_start, word_end.first.size(), consecutive});
+        scan_pos = start + word_end.first.size();
+        prev_end  = global_start + word_end.first.size();
+    }
+    if (!result.empty()) on_chain(result);
 }
+
+void AhoCorasickCPU::apply_policy_cb(
+    const std::vector<std::pair<std::size_t, std::string>>& raw,
+    std::size_t global_offset,
+    const std::function<void(const std::vector<WordMatch>&)>& on_chain) const {
+    if (policy_ == OverlapPolicy::AllCombos)
+        apply_all_combos_cb(raw, global_offset, on_chain);
+    else
+        apply_etl_cb(raw, global_offset, on_chain);
+}
+

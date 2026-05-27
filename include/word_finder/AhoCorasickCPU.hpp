@@ -33,14 +33,24 @@ public:
 
     // Enumerate all non-overlapping word chains in raw (global-position pairs),
     // calling on_chain once per complete chain. Memory stays O(max_chain_depth).
+    // on_chain is called 0–N times.
     void apply_all_combos_cb(
         const std::vector<std::pair<std::size_t, std::string>>& raw,
         std::size_t global_offset,
         const std::function<void(const std::vector<WordMatch>&)>& on_chain) const;
 
-    // Apply ETL policy to global-position raw pairs. Returns the one ETL sequence.
-    std::vector<WordMatch> apply_etl(
-        std::vector<std::pair<std::size_t, std::string>>& raw);
+    // Apply ETL policy to raw (global-position pairs), calling on_chain at most once
+    // with the greedy-selected chain. Not called when no matches exist.
+    void apply_etl_cb(
+        const std::vector<std::pair<std::size_t, std::string>>& raw,
+        std::size_t global_offset,
+        const std::function<void(const std::vector<WordMatch>&)>& on_chain) const;
+
+    // Dispatch to apply_etl_cb or apply_all_combos_cb based on the configured policy.
+    void apply_policy_cb(
+        const std::vector<std::pair<std::size_t, std::string>>& raw,
+        std::size_t global_offset,
+        const std::function<void(const std::vector<WordMatch>&)>& on_chain) const;
 
     OverlapPolicy get_overlap_policy() const { return policy_; }
     std::size_t max_word_length() const { return max_word_len_; }
@@ -60,11 +70,4 @@ private:
     std::size_t max_word_len_{0};
     bool built_{false};
 
-    std::vector<std::vector<WordMatch>> apply_earliest_then_longest(
-        std::vector<std::pair<std::size_t, std::string>>& raw,
-        std::size_t global_offset);
-
-    std::vector<std::vector<WordMatch>> apply_all_combos(
-        const std::vector<std::pair<std::size_t, std::string>>& raw,
-        std::size_t global_offset);
 };
