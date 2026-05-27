@@ -24,29 +24,17 @@ TEST(TwoDigitBlockMapper, Properties) {
     EXPECT_EQ(m.alphabet(), "abcdefghijklmnopqrstuvwxyz");
 }
 
-TEST(TwoDigitBlockMapper, FirstCycle) {
+TEST(TwoDigitBlockMapper, ModuloCycles) {
     TwoDigitBlockMapper m;
     EXPECT_EQ(map_digits(m, {0,0}), "a");  // 00 % 26 = 0
     EXPECT_EQ(map_digits(m, {0,1}), "b");  // 01 % 26 = 1
     EXPECT_EQ(map_digits(m, {2,5}), "z");  // 25 % 26 = 25
-}
-
-TEST(TwoDigitBlockMapper, SecondCycle) {
-    TwoDigitBlockMapper m;
     EXPECT_EQ(map_digits(m, {2,6}), "a");  // 26 % 26 = 0
     EXPECT_EQ(map_digits(m, {5,1}), "z");  // 51 % 26 = 25
-}
-
-TEST(TwoDigitBlockMapper, ThirdCycle) {
-    TwoDigitBlockMapper m;
     EXPECT_EQ(map_digits(m, {5,2}), "a");  // 52 % 26 = 0
     EXPECT_EQ(map_digits(m, {7,7}), "z");  // 77 % 26 = 25
-}
-
-TEST(TwoDigitBlockMapper, FourthCyclePartial) {
-    TwoDigitBlockMapper m;
     EXPECT_EQ(map_digits(m, {7,8}), "a");  // 78 % 26 = 0
-    EXPECT_EQ(map_digits(m, {9,9}), "v");  // 99 % 26 = 21 -> 'v'
+    EXPECT_EQ(map_digits(m, {9,9}), "v");  // 99 % 26 = 21
 }
 
 TEST(TwoDigitBlockMapper, PiPrefix) {

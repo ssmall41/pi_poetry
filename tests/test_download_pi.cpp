@@ -14,18 +14,11 @@ std::filesystem::path make_temp_file(const std::string& content) {
 
 }  // namespace
 
-TEST(ReadAndValidateInputFile, ValidFile_ReturnsDigits) {
+TEST(ReadAndValidateInputFile, ValidFile_ReturnsStrippedDigits) {
     auto p = make_temp_file("31415\n");
     auto result = read_and_validate_input_file(p.string());
     ASSERT_TRUE(result.has_value());
     EXPECT_EQ(*result, "31415");
-}
-
-TEST(ReadAndValidateInputFile, TrailingNewlineStripped) {
-    auto p = make_temp_file("31415\n");
-    auto result = read_and_validate_input_file(p.string());
-    ASSERT_TRUE(result.has_value());
-    EXPECT_EQ(result->size(), 5u);
 }
 
 TEST(ReadAndValidateInputFile, NonDigitChars_ReturnsNullopt) {

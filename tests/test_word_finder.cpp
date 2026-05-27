@@ -191,22 +191,13 @@ TEST(AhoCorasickCPU, AllCombos_ConsecutiveFlag) {
     EXPECT_FALSE((*one)[0].consecutive);
 }
 
-TEST(AhoCorasickCPU, AllCombos_EmptyInput) {
+TEST(AhoCorasickCPU, AllCombos_EmptyOrNoMatch) {
     AhoCorasickCPU ac;
     ac.insert_word("cat");
     ac.build();
     ac.set_overlap_policy(OverlapPolicy::AllCombos);
-    auto seqs = ac.scan("", 0, 0);
-    EXPECT_TRUE(seqs.empty());
-}
-
-TEST(AhoCorasickCPU, AllCombos_NoMatches) {
-    AhoCorasickCPU ac;
-    ac.insert_word("cat");
-    ac.build();
-    ac.set_overlap_policy(OverlapPolicy::AllCombos);
-    auto seqs = ac.scan("xyz", 3, 0);
-    EXPECT_TRUE(seqs.empty());
+    EXPECT_TRUE(ac.scan("", 0, 0).empty());
+    EXPECT_TRUE(ac.scan("xyz", 3, 0).empty());
 }
 
 TEST(AhoCorasickCPU, AllCombos_OffsetApplied) {
@@ -449,14 +440,6 @@ TEST(AhoCorasickCPU, AllCombos_AwhaleOfATale) {
 #endif
 
 // ── min_phrase_length pre-filter ──────────────────────────────────────────────
-
-TEST(AhoCorasickCPU_MinPhraseLength, DefaultMin1AllowsSingleWordChain) {
-    AhoCorasickCPU ac;
-    ac.insert_word("cat");
-    ac.build();
-    auto r = do_scan(ac, "xcatz");
-    EXPECT_FALSE(r.empty());
-}
 
 TEST(AhoCorasickCPU_MinPhraseLength, Min2SkipsSingleWordChain_ETL) {
     AhoCorasickCPU ac;

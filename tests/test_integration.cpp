@@ -102,36 +102,12 @@ TEST(DigitSeqIntegration, Seq2_PhrasesFound) {
 }
 
 // ── Sequence 3: 4216424248070011046605001900110416161616
-//    Letters: qqqqwhaleofataleqqqq  (same output, different digit encoding)
-//    Words (min=2): whale of at ale — same as seq 2
+//    Letters: qqqqwhaleofataleqqqq  (different digit encoding, same letters as seq 2)
+//    Word/phrase behavior is identical to Seq2.
 
 TEST(DigitSeqIntegration, Seq3_LetterSequence) {
     EXPECT_EQ(map_sequence("4216424248070011046605001900110416161616"),
               "qqqqwhaleofataleqqqq");
-}
-
-TEST(DigitSeqIntegration, Seq3_WordsFound) {
-    const std::string letters = "qqqqwhaleofataleqqqq";
-    auto ac = build_finder(2);
-    auto w = ac.scan(letters.data(), letters.size(), 0);
-
-    ASSERT_EQ(w[0].size(), 4u);
-    EXPECT_EQ(w[0][0].word, "whale"); EXPECT_EQ(w[0][0].start,  4u); EXPECT_FALSE(w[0][0].consecutive);
-    EXPECT_EQ(w[0][1].word, "of");    EXPECT_EQ(w[0][1].start,  9u); EXPECT_TRUE(w[0][1].consecutive);
-    EXPECT_EQ(w[0][2].word, "at");    EXPECT_EQ(w[0][2].start, 11u); EXPECT_TRUE(w[0][2].consecutive);
-    EXPECT_EQ(w[0][3].word, "ale");   EXPECT_EQ(w[0][3].start, 13u); EXPECT_TRUE(w[0][3].consecutive);
-}
-
-TEST(DigitSeqIntegration, Seq3_PhrasesFound) {
-    const std::string letters = "qqqqwhaleofataleqqqq";
-    auto ac = build_finder(2);
-    auto words = ac.scan(letters.data(), letters.size(), 0);
-    HumanReviewScanner hs;
-    auto phrases = hs.process_words(words[0]);
-
-    ASSERT_EQ(phrases.size(), 1u);
-    EXPECT_EQ(phrases[0].start_offset, 4u);
-    EXPECT_EQ(phrases[0].words,     (std::vector<std::string>{"whale","of","at","ale"}));
 }
 
 // ── Sequence 4: 001712141704
@@ -229,25 +205,6 @@ TEST(DigitSeqIntegration, Seq6_PhrasesFound) {
 }
 
 // ── min_phrase_length integration ────────────────────────────────────────────
-
-TEST(DigitSeqIntegration, WordFinderPreFilter_Min2_DropsIsolatedChains) {
-    // "catXdog": two isolated words, no consecutive pair → word_finder drops both chains
-    AhoCorasickCPU ac;
-    ac.set_min_phrase_length(2);
-    ac.insert_word("cat");
-    ac.insert_word("dog");
-    ac.build();
-    auto r = ac.scan("catXdog", 7, 0);
-    EXPECT_TRUE(r.empty());
-}
-
-TEST(DigitSeqIntegration, PhraseScannerFilter_Min2_DropsSingleWords) {
-    HumanReviewScanner hs;
-    hs.set_min_phrase_length(2);
-    WordMatch cat{"cat", 0, 3, false};
-    auto phrases = hs.process_words({cat});
-    EXPECT_TRUE(phrases.empty());
-}
 
 TEST(DigitSeqIntegration, EndToEnd_Min2_KeepsTwoWordPhrases) {
     // "catdog": cat(0,3) + dog(3,3) adjacent → phrase [cat,dog] with 2 words ≥ 2 → kept

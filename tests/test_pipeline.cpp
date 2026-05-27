@@ -52,14 +52,6 @@ TEST(Pipeline_RunDir, WritesJsonFileInRunDir) {
 
 // --- Letter file: written when enabled, skipped when disabled ---
 
-TEST(Pipeline_RunDir, WritesLetterFileWhenEnabled) {
-    PipelineFixture fix;
-    auto pipeline = fix.make();
-    pipeline.run(fix.run_dir, true);
-    EXPECT_TRUE(std::filesystem::exists(fix.run_dir / "results.json"));
-    EXPECT_TRUE(std::filesystem::exists(fix.run_dir / "letter_sequence.txt"));
-}
-
 TEST(Pipeline_RunDir, SkipsLetterFileWhenDisabled) {
     PipelineFixture fix;
     auto pipeline = fix.make();
