@@ -91,6 +91,15 @@ std::vector<std::string> validate_config(const toml::table& config) {
     }
 
     {
+        auto v = config["phrase_scanner"]["min_phrase_length"].value<int64_t>();
+        if (v && *v < 1)
+            errors.push_back("phrase_scanner.min_phrase_length: must be >= 1, got " +
+                             std::to_string(*v));
+        else if (!v && config["phrase_scanner"]["min_phrase_length"])
+            errors.push_back("phrase_scanner.min_phrase_length: must be an integer >= 1");
+    }
+
+    {
         std::string path = config["digit_source"]["path"]
                                .value_or(std::string("data/pi_2000.txt"));
         if (!std::filesystem::exists(path))

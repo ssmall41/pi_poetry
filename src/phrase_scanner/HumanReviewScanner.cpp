@@ -3,6 +3,10 @@
 #include <iostream>
 #include <nlohmann/json.hpp>
 
+void HumanReviewScanner::set_min_phrase_length(std::size_t min_len) {
+    min_phrase_length_ = min_len;
+}
+
 std::vector<PhraseMatch> HumanReviewScanner::process_words(
     const std::vector<WordMatch>& word_stream) {
 
@@ -34,7 +38,7 @@ std::vector<PhraseMatch> HumanReviewScanner::process_words(
             ++j;
         }
 
-        result.push_back(std::move(phrase));
+        if (phrase.words.size() >= min_phrase_length_) result.push_back(std::move(phrase));
 
         i = j > i + 1 ? j : i + 1;  // skip merged words
     }
@@ -55,7 +59,8 @@ void HumanReviewScanner::process_words_streaming(
         } else {
             int gap = static_cast<int>(w.start) - static_cast<int>(pending_end_);
             if (gap != 0) {
-                on_phrase(std::move(*pending_phrase_));
+                if (pending_phrase_->words.size() >= min_phrase_length_)
+                    on_phrase(std::move(*pending_phrase_));
                 pending_phrase_.emplace();
                 pending_phrase_->start_offset = w.start;
                 pending_phrase_->words.push_back(w.word);
@@ -71,7 +76,8 @@ void HumanReviewScanner::process_words_streaming(
 void HumanReviewScanner::flush_streaming(
     const std::function<void(PhraseMatch)>& on_phrase) {
     if (pending_phrase_) {
-        on_phrase(std::move(*pending_phrase_));
+        if (pending_phrase_->words.size() >= min_phrase_length_)
+            on_phrase(std::move(*pending_phrase_));
         pending_phrase_.reset();
         pending_end_ = 0;
     }

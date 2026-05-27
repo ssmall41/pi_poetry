@@ -7,6 +7,17 @@
 #include <queue>
 #include <string>
 
+static bool chain_has_qualifying_run(const std::vector<WordMatch>& chain,
+                                      std::size_t min_length) {
+    if (min_length <= 1) return !chain.empty();
+    std::size_t run = 0;
+    for (const auto& m : chain) {
+        run = m.consecutive ? run + 1 : 1;
+        if (run >= min_length) return true;
+    }
+    return false;
+}
+
 AhoCorasickCPU::AhoCorasickCPU() {
     nodes_.emplace_back();  // root node 0
 }
@@ -76,6 +87,10 @@ void AhoCorasickCPU::set_overlap_policy(OverlapPolicy policy) {
 
 void AhoCorasickCPU::set_min_word_length(std::size_t min_len) {
     min_word_length_ = min_len;
+}
+
+void AhoCorasickCPU::set_min_phrase_length(std::size_t min_len) {
+    min_phrase_length_ = min_len;
 }
 
 std::vector<std::vector<WordMatch>> AhoCorasickCPU::scan(const char* char_buffer,
@@ -155,7 +170,7 @@ void AhoCorasickCPU::apply_all_combos_cb(
             for (const auto& [word, end_pos] : it->second) {
                 WordMatch m{word, global_offset + pos, word.size(), !current.empty()};
                 current.push_back(m);
-                on_chain(current);
+                if (chain_has_qualifying_run(current, min_phrase_length_)) on_chain(current);
                 dfs(end_pos, current);
                 current.pop_back();
             }
@@ -190,7 +205,7 @@ void AhoCorasickCPU::apply_etl_cb(
         scan_pos = start + word_end.first.size();
         prev_end  = global_start + word_end.first.size();
     }
-    if (!result.empty()) on_chain(result);
+    if (!result.empty() && chain_has_qualifying_run(result, min_phrase_length_)) on_chain(result);
 }
 
 void AhoCorasickCPU::apply_policy_cb(

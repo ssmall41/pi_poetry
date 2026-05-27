@@ -66,6 +66,8 @@ int main(int argc, char* argv[]) {
         int mapper_threads  = config["digit_mapper"]["threads"].value_or(1);
         int finder_threads  = config["word_finder"]["threads"].value_or(1);
         int scanner_threads = config["phrase_scanner"]["threads"].value_or(1);
+        std::size_t min_phrase_length = static_cast<std::size_t>(
+            config["phrase_scanner"]["min_phrase_length"].value_or(int64_t{1}));
         bool debug          = config["pipeline"]["debug"].value_or(false);
         std::size_t digit_q_capacity  = config["digit_source"]["queue_size"].value_or(16);
         std::size_t letter_q_capacity = config["digit_mapper"]["queue_size"].value_or(16);
@@ -81,6 +83,8 @@ int main(int argc, char* argv[]) {
         finder.load_dictionary(dict_path);
         finder.build();
         HumanReviewScanner scanner;
+        finder.set_min_phrase_length(min_phrase_length);
+        scanner.set_min_phrase_length(min_phrase_length);
 
         Pipeline pipeline(source, mapper, finder, scanner);
         Pipeline::ParallelConfig pcfg;
