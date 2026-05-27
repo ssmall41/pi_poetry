@@ -127,14 +127,6 @@ TEST(HumanReviewScanner, JsonOutputStructure) {
               (std::vector<std::string>{"cat", "dog"}));
 }
 
-TEST(HumanReviewScanner, IsolatedWordTextOutput) {
-    HumanReviewScanner hs;
-    auto phrases = hs.process_words({make_word("fox", 5)});
-    std::ostringstream oss;
-    hs.write_text(phrases, oss);
-    EXPECT_EQ(oss.str(), "Offset 5: fox\n");
-}
-
 TEST(HumanReviewScanner, IsolatedWordJsonOutput) {
     HumanReviewScanner hs;
     auto phrases = hs.process_words({make_word("fox", 5)});
@@ -225,17 +217,3 @@ TEST(HumanReviewScanner, StreamingBatchBoundaryDoesNotSplitPhrase) {
     EXPECT_EQ(phrases[0].gap_sizes, (std::vector<int>{0}));
 }
 
-TEST(HumanReviewScanner, TextOutputFormat) {
-    HumanReviewScanner hs;
-    // emt(3) at 97 ends at 100; ten(3) at 104 gap=4
-    auto phrases = hs.process_words({
-        make_word("emt", 97),
-        make_word("ten", 104),
-    });
-    std::ostringstream oss;
-    hs.write_text(phrases, oss);
-    const auto s = oss.str();
-    EXPECT_NE(s.find("97"), std::string::npos);
-    EXPECT_NE(s.find("emt"), std::string::npos);
-    EXPECT_NE(s.find("ten"), std::string::npos);
-}

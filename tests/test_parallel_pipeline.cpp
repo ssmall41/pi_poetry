@@ -165,16 +165,24 @@ TEST(ParallelPipeline, AllCombosParallel_ProducesAllSequences) {
     cfg.scanner_threads = 2;
     Pipeline{source, mapper, finder, scanner}.run_parallel(run_dir, cfg);
 
-    std::ifstream f(run_dir / "results.txt");
+    std::ifstream f(run_dir / "results.json");
     ASSERT_TRUE(f.is_open());
-    std::string contents((std::istreambuf_iterator<char>(f)),
-                          std::istreambuf_iterator<char>());
+    auto j = nlohmann::json::parse(f);
     std::filesystem::remove_all(run_dir);
     std::filesystem::remove(digit_file);
 
-    EXPECT_NE(contents.find("Offset 0: ab\n"),  std::string::npos) << contents;
-    EXPECT_NE(contents.find("Offset 0: a "),    std::string::npos) << contents;
-    EXPECT_NE(contents.find("Offset 1: b\n"),   std::string::npos) << contents;
+    const auto& phrases = j["phrases"];
+    auto has_phrase = [&](std::size_t offset, std::vector<std::string> words) {
+        for (const auto& p : phrases) {
+            if (p["start_offset"].get<std::size_t>() == offset &&
+                p["words"].get<std::vector<std::string>>() == words)
+                return true;
+        }
+        return false;
+    };
+    EXPECT_TRUE(has_phrase(0, {"ab"}));
+    EXPECT_TRUE(has_phrase(0, {"a", "b"}));
+    EXPECT_TRUE(has_phrase(1, {"b"}));
 }
 
 // ── AllCombos parallel matches serial (set-equality) ─────────────────────────

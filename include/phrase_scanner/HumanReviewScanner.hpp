@@ -14,9 +14,6 @@ public:
 
     void set_gap_policy(GapPolicy policy) override;
 
-    void write_results(const std::vector<PhraseMatch>& phrases,
-                       const std::filesystem::path& run_dir) const override;
-
     // Streaming phrase detection: feed ordered batches of word matches.
     // on_phrase is called for each phrase that is finalized.
     // Call flush_streaming() after the last batch to emit any pending phrase.
@@ -25,12 +22,7 @@ public:
         const std::function<void(PhraseMatch)>& on_phrase);
     void flush_streaming(const std::function<void(PhraseMatch)>& on_phrase);
 
-    // Per-phrase stream writers (used by streaming pipeline and tests)
-    static void write_text_phrase(std::ostream& out, const PhraseMatch& p);
     static void write_json_phrase(std::ostream& out, const PhraseMatch& p);
-
-    // Bulk stream writers (used directly in tests)
-    void write_text(const std::vector<PhraseMatch>& phrases, std::ostream& out) const;
     void write_json(const std::vector<PhraseMatch>& phrases, std::ostream& out) const;
 
 private:
