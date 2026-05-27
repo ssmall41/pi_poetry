@@ -47,7 +47,6 @@ std::vector<std::string> validate_config(const toml::table& config) {
     check_reserved_str("digit_mapper",  "alphabet", "alpha-lower");
     check_reserved_str("word_finder",   "type",     "aho-corasick-cpu");
     check_reserved_str("phrase_scanner","type",     "human-review");
-    check_reserved_str("phrase_scanner","mode",     "gap-tolerant");
 
     auto check_threads = [&](std::string_view section) {
         auto v = config[section]["threads"].value<int64_t>();
@@ -89,15 +88,6 @@ std::vector<std::string> validate_config(const toml::table& config) {
                              std::to_string(*v));
         else if (!v && config["word_finder"]["min_word_length"])
             errors.push_back("word_finder.min_word_length: must be an integer >= 1");
-    }
-
-    {
-        auto v = config["phrase_scanner"]["max_gap"].value<int64_t>();
-        if (v && *v < 0)
-            errors.push_back("phrase_scanner.max_gap: must be >= 0, got " +
-                             std::to_string(*v));
-        else if (!v && config["phrase_scanner"]["max_gap"])
-            errors.push_back("phrase_scanner.max_gap: must be an integer >= 0");
     }
 
     {

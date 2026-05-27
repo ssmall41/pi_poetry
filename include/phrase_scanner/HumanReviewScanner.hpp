@@ -6,13 +6,8 @@
 
 class HumanReviewScanner final : public PhraseScanner {
 public:
-    explicit HumanReviewScanner(int max_gap = 5);
-    int max_gap() const { return max_gap_; }
-
     std::vector<PhraseMatch> process_words(
         const std::vector<WordMatch>& word_stream) override;
-
-    void set_gap_policy(GapPolicy policy) override;
 
     // Streaming phrase detection: feed ordered batches of word matches.
     // on_phrase is called for each phrase that is finalized.
@@ -26,9 +21,6 @@ public:
     void write_json(const std::vector<PhraseMatch>& phrases, std::ostream& out) const;
 
 private:
-    int max_gap_;
-    GapPolicy policy_{GapPolicy::GapTolerant};
-
     // Streaming state
     std::optional<PhraseMatch> pending_phrase_;
     std::size_t pending_end_{0};

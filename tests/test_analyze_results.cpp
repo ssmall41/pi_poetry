@@ -11,9 +11,8 @@ using namespace result_analyzer;
 namespace {
 
 Phrase make_phrase(std::size_t offset,
-                   std::vector<std::string> words,
-                   std::vector<int> gaps = {}) {
-    return {offset, std::move(words), std::move(gaps)};
+                   std::vector<std::string> words) {
+    return {offset, std::move(words)};
 }
 
 AnalysisData make_data(std::vector<Phrase> phrases) {
@@ -33,22 +32,20 @@ TEST(ResultAnalyzer, ParseSinglePhrase) {
     auto data = parse_results_json(R"({
         "phrases": [{
             "start_offset": 113,
-            "words": ["meh", "tut", "ewer"],
-            "gap_sizes": [5, 2]
+            "words": ["meh", "tut", "ewer"]
         }]
     })");
     ASSERT_EQ(data.phrases.size(), 1u);
     EXPECT_EQ(data.phrases[0].start_offset, 113u);
     EXPECT_EQ(data.phrases[0].words, (std::vector<std::string>{"meh", "tut", "ewer"}));
-    EXPECT_EQ(data.phrases[0].gap_sizes, (std::vector<int>{5, 2}));
 }
 
 TEST(ResultAnalyzer, ParseMultiplePhrases) {
     auto data = parse_results_json(R"({
         "phrases": [
-            {"start_offset": 5,   "words": ["a"],      "gap_sizes": []},
-            {"start_offset": 100, "words": ["be", "ox"], "gap_sizes": [1]},
-            {"start_offset": 200, "words": ["cat"],    "gap_sizes": []}
+            {"start_offset": 5,   "words": ["a"]},
+            {"start_offset": 100, "words": ["be", "ox"]},
+            {"start_offset": 200, "words": ["cat"]}
         ]
     })");
     ASSERT_EQ(data.phrases.size(), 3u);
@@ -78,25 +75,25 @@ TEST(ResultAnalyzer, ComputeOffsets_SingleWordPhrase) {
 }
 
 TEST(ResultAnalyzer, ComputeOffsets_MultiWordPhrase) {
-    // "meh"(3) at 113, gap=5 → "tut"(3) at 121, gap=2 → "ewer"(4) at 126
-    auto data = make_data({make_phrase(113, {"meh", "tut", "ewer"}, {5, 2})});
+    // "meh"(3) at 113 → "tut"(3) at 116 → "ewer"(4) at 119
+    auto data = make_data({make_phrase(113, {"meh", "tut", "ewer"})});
     auto occ = compute_word_occurrences(data);
     ASSERT_EQ(occ.size(), 3u);
     EXPECT_EQ(occ[0].word, "meh");  EXPECT_EQ(occ[0].offset, 113u);
-    EXPECT_EQ(occ[1].word, "tut");  EXPECT_EQ(occ[1].offset, 121u);
-    EXPECT_EQ(occ[2].word, "ewer"); EXPECT_EQ(occ[2].offset, 126u);
+    EXPECT_EQ(occ[1].word, "tut");  EXPECT_EQ(occ[1].offset, 116u);
+    EXPECT_EQ(occ[2].word, "ewer"); EXPECT_EQ(occ[2].offset, 119u);
 }
 
 TEST(ResultAnalyzer, ComputeOffsets_MultiplePhrases) {
     auto data = make_data({
-        make_phrase(10, {"cat", "dog"}, {1}),
+        make_phrase(10, {"cat", "dog"}),
         make_phrase(500, {"ox"}),
     });
     auto occ = compute_word_occurrences(data);
     ASSERT_EQ(occ.size(), 3u);
-    // "cat" at 10, "dog" at 10+3+1=14, "ox" at 500 (independent reset)
+    // "cat" at 10, "dog" at 10+3=13, "ox" at 500 (independent phrase)
     EXPECT_EQ(occ[0].offset, 10u);
-    EXPECT_EQ(occ[1].offset, 14u);
+    EXPECT_EQ(occ[1].offset, 13u);
     EXPECT_EQ(occ[2].offset, 500u);
 }
 
@@ -127,7 +124,7 @@ TEST(ResultAnalyzer, WritePhraseFile_NoMatchingLength) {
 }
 
 TEST(ResultAnalyzer, WritePhraseFile_SinglePhrase) {
-    std::vector<Phrase> phrases = {make_phrase(113, {"meh", "tut", "ewer"}, {5, 2})};
+    std::vector<Phrase> phrases = {make_phrase(113, {"meh", "tut", "ewer"})};
     std::ostringstream oss;
     write_phrase_file(phrases, 3, oss);
     EXPECT_EQ(oss.str(), "113: meh tut ewer\n");
@@ -135,9 +132,9 @@ TEST(ResultAnalyzer, WritePhraseFile_SinglePhrase) {
 
 TEST(ResultAnalyzer, WritePhraseFile_MultiplePhrasesInOrder) {
     std::vector<Phrase> phrases = {
-        make_phrase(5,   {"ox", "cat"}, {0}),
-        make_phrase(100, {"be", "in"},  {2}),
-        make_phrase(200, {"go", "on"},  {1}),
+        make_phrase(5,   {"ox", "cat"}),
+        make_phrase(100, {"be", "in"}),
+        make_phrase(200, {"go", "on"}),
     };
     std::ostringstream oss;
     write_phrase_file(phrases, 2, oss);
@@ -153,7 +150,7 @@ TEST(ResultAnalyzer, WritePhraseFile_MultiplePhrasesInOrder) {
 TEST(ResultAnalyzer, WritePhraseFile_IgnoresOtherLengths) {
     std::vector<Phrase> phrases = {
         make_phrase(10, {"cat"}),
-        make_phrase(20, {"ox", "be"}, {1}),
+        make_phrase(20, {"ox", "be"}),
         make_phrase(30, {"fox"}),
     };
     std::ostringstream oss;
@@ -210,10 +207,10 @@ TEST(ResultAnalyzer, WriteStatistics_PhraseCounts) {
     auto data = make_data({
         make_phrase(0,   {"a"}),
         make_phrase(10,  {"be"}),
-        make_phrase(20,  {"cat", "dog"}, {0}),
-        make_phrase(30,  {"cat", "dog"}, {0}),
-        make_phrase(40,  {"cat", "dog"}, {0}),
-        make_phrase(50,  {"fox", "ox", "be"}, {1, 0}),
+        make_phrase(20,  {"cat", "dog"}),
+        make_phrase(30,  {"cat", "dog"}),
+        make_phrase(40,  {"cat", "dog"}),
+        make_phrase(50,  {"fox", "ox", "be"}),
     });
     std::ostringstream oss;
     write_statistics(data, oss);

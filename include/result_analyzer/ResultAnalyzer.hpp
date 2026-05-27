@@ -9,7 +9,6 @@ namespace result_analyzer {
 struct Phrase {
     std::size_t start_offset{};
     std::vector<std::string> words;
-    std::vector<int> gap_sizes;
 };
 
 struct WordOccurrence {

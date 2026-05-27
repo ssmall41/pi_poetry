@@ -7,12 +7,6 @@
 struct PhraseMatch {
     std::size_t start_offset;
     std::vector<std::string> words;
-    std::vector<int> gap_sizes;  // gap in chars between consecutive words
-};
-
-enum class GapPolicy {
-    Strict,       // zero gaps allowed
-    GapTolerant,  // MVP: gaps up to max_gap allowed
 };
 
 class PhraseScanner {
@@ -23,6 +17,4 @@ public:
     // single words), sorted by start_offset ascending.
     virtual std::vector<PhraseMatch> process_words(
         const std::vector<WordMatch>& word_stream) = 0;
-
-    virtual void set_gap_policy(GapPolicy policy) = 0;
 };

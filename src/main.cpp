@@ -38,7 +38,6 @@ int main(int argc, char* argv[]) {
             config["digit_source"]["chunk_size"].value_or(int64_t{131072}));
         std::string dict_path = config["word_finder"]["dictionary"].value_or(
             std::string("dictionaries/english.txt"));
-        int max_gap = config["phrase_scanner"]["max_gap"].value_or(5);
         std::size_t min_word_length = config["word_finder"]["min_word_length"].value_or(
             std::size_t{1});
         std::string out_dir = config["output"]["dir"].value_or(std::string("outputs"));
@@ -81,7 +80,7 @@ int main(int argc, char* argv[]) {
             finder.set_overlap_policy(OverlapPolicy::AllCombos);
         finder.load_dictionary(dict_path);
         finder.build();
-        HumanReviewScanner scanner(max_gap);
+        HumanReviewScanner scanner;
 
         Pipeline pipeline(source, mapper, finder, scanner);
         Pipeline::ParallelConfig pcfg;
