@@ -206,7 +206,17 @@ void AhoCorasickCPU::apply_etl_cb(
         scan_pos = start + word_end.first.size();
         prev_end  = global_start + word_end.first.size();
     }
-    if (!result.empty() && chain_has_qualifying_run(result, min_phrase_length_)) on_chain(result);
+
+    std::vector<WordMatch> group;
+    for (const auto& wm : result) {
+        if (!wm.consecutive && !group.empty()) {
+            if (group.size() >= min_phrase_length_) on_chain(group);
+            else ++dropped_count_;
+            group.clear();
+        }
+        group.push_back(wm);
+    }
+    if (!group.empty() && group.size() >= min_phrase_length_) on_chain(group);
     else if (!result.empty()) ++dropped_count_;
 }
 

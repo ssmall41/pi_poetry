@@ -49,8 +49,8 @@ public:
         std::size_t global_offset,
         const std::function<void(const std::vector<WordMatch>&)>& on_chain) const;
 
-    // Apply ETL policy to raw (global-position pairs), calling on_chain at most once
-    // with the greedy-selected chain. Not called when no matches exist.
+    // Apply ETL policy to raw (global-position pairs), calling on_chain 0–N times —
+    // once per consecutive phrase group that meets min_phrase_length.
     void apply_etl_cb(
         const std::vector<std::pair<std::size_t, std::string>>& raw,
         std::size_t global_offset,
