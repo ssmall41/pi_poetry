@@ -38,11 +38,14 @@ TEST(AhoCorasickCPU, MultipleNonOverlappingWords) {
     ac.insert_word("dog");
     ac.build();
     auto r = do_scan(ac, "catXdog");
-    ASSERT_EQ(r[0].size(), 2u);
+    // ETL splits at gap: two separate single-word chains
+    ASSERT_EQ(r.size(), 2u);
+    ASSERT_EQ(r[0].size(), 1u);
     EXPECT_EQ(r[0][0].word, "cat");
     EXPECT_EQ(r[0][0].start, 0u);
-    EXPECT_EQ(r[0][1].word, "dog");
-    EXPECT_EQ(r[0][1].start, 4u);
+    ASSERT_EQ(r[1].size(), 1u);
+    EXPECT_EQ(r[1][0].word, "dog");
+    EXPECT_EQ(r[1][0].start, 4u);
 }
 
 TEST(AhoCorasickCPU, EarliestThenLongest) {
@@ -111,9 +114,14 @@ TEST(AhoCorasickCPU, ConsecutiveFlagFalseWithGap) {
     ac.insert_word("dog");
     ac.build();
     auto r = do_scan(ac, "catXdog");
-    ASSERT_EQ(r[0].size(), 2u);
+    // ETL splits at gap boundaries: two separate single-word chains
+    ASSERT_EQ(r.size(), 2u);
+    ASSERT_EQ(r[0].size(), 1u);
+    ASSERT_EQ(r[1].size(), 1u);
+    EXPECT_EQ(r[0][0].word, "cat");
     EXPECT_FALSE(r[0][0].consecutive);
-    EXPECT_FALSE(r[0][1].consecutive);
+    EXPECT_EQ(r[1][0].word, "dog");
+    EXPECT_FALSE(r[1][0].consecutive);
 }
 
 TEST(AhoCorasickCPU, OffsetAppliedToMatchStart) {
@@ -485,7 +493,7 @@ TEST(AhoCorasickCPU_MinPhraseLength, Min2SkipsMixedChainWithNoRun_ETL) {
 }
 
 TEST(AhoCorasickCPU_MinPhraseLength, Min2KeepsMixedChainWithRun_ETL) {
-    // "catdogXfox" → ETL chain [cat, dog, fox]: cat+dog form run of 2 ≥ 2 → kept
+    // "catdogXfox" → ETL splits at gap: [cat,dog] qualifies (run of 2), [fox] dropped (1 < 2)
     AhoCorasickCPU ac;
     ac.set_min_phrase_length(2);
     ac.insert_word("cat");
@@ -494,7 +502,9 @@ TEST(AhoCorasickCPU_MinPhraseLength, Min2KeepsMixedChainWithRun_ETL) {
     ac.build();
     auto r = do_scan(ac, "catdogXfox");
     ASSERT_EQ(r.size(), 1u);
-    ASSERT_EQ(r[0].size(), 3u);
+    ASSERT_EQ(r[0].size(), 2u);
+    EXPECT_EQ(r[0][0].word, "cat");
+    EXPECT_EQ(r[0][1].word, "dog");
 }
 
 TEST(AhoCorasickCPU_MinPhraseLength, Min2SkipsAllCombosChainNoConsecutive) {
