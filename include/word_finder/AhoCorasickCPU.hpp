@@ -1,6 +1,7 @@
 #pragma once
 #include "WordFinder.hpp"
 #include <array>
+#include <atomic>
 #include <functional>
 #include <string>
 #include <utility>
@@ -9,6 +10,14 @@
 class AhoCorasickCPU final : public WordFinder {
 public:
     AhoCorasickCPU();
+    AhoCorasickCPU(AhoCorasickCPU&& other) noexcept
+        : nodes_(std::move(other.nodes_)),
+          policy_(other.policy_),
+          min_word_length_(other.min_word_length_),
+          min_phrase_length_(other.min_phrase_length_),
+          max_word_len_(other.max_word_len_),
+          built_(other.built_),
+          dropped_count_(other.dropped_count_.load()) {}
 
     std::vector<std::vector<WordMatch>> scan(const char* char_buffer,
                                              std::size_t buf_len,
@@ -55,6 +64,7 @@ public:
 
     OverlapPolicy get_overlap_policy() const { return policy_; }
     std::size_t max_word_length() const { return max_word_len_; }
+    std::size_t dropped_count() const override { return dropped_count_.load(); }
 
 private:
     struct AcNode {
@@ -71,5 +81,6 @@ private:
     std::size_t min_phrase_length_{1};
     std::size_t max_word_len_{0};
     bool built_{false};
+    mutable std::atomic<std::size_t> dropped_count_{0};
 
 };

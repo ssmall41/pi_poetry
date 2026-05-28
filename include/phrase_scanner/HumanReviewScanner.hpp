@@ -1,5 +1,6 @@
 #pragma once
 #include "PhraseScanner.hpp"
+#include <atomic>
 #include <functional>
 #include <iosfwd>
 #include <optional>
@@ -18,6 +19,7 @@ public:
     void flush_streaming(const std::function<void(PhraseMatch)>& on_phrase);
 
     void set_min_phrase_length(std::size_t min_len);
+    std::size_t dropped_count() const override { return dropped_count_.load(); }
 
     static void write_json_phrase(std::ostream& out, const PhraseMatch& p);
     void write_json(const std::vector<PhraseMatch>& phrases, std::ostream& out) const;
@@ -27,4 +29,5 @@ private:
     std::optional<PhraseMatch> pending_phrase_;
     std::size_t pending_end_{0};
     std::size_t min_phrase_length_{1};
+    mutable std::atomic<std::size_t> dropped_count_{0};
 };

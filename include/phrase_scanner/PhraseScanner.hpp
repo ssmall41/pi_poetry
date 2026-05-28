@@ -17,4 +17,5 @@ public:
     // single words), sorted by start_offset ascending.
     virtual std::vector<PhraseMatch> process_words(
         const std::vector<WordMatch>& word_stream) = 0;
+    virtual std::size_t dropped_count() const = 0;
 };

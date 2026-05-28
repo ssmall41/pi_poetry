@@ -171,6 +171,7 @@ void AhoCorasickCPU::apply_all_combos_cb(
                 WordMatch m{word, global_offset + pos, word.size(), !current.empty()};
                 current.push_back(m);
                 if (chain_has_qualifying_run(current, min_phrase_length_)) on_chain(current);
+                else ++dropped_count_;
                 dfs(end_pos, current);
                 current.pop_back();
             }
@@ -206,6 +207,7 @@ void AhoCorasickCPU::apply_etl_cb(
         prev_end  = global_start + word_end.first.size();
     }
     if (!result.empty() && chain_has_qualifying_run(result, min_phrase_length_)) on_chain(result);
+    else if (!result.empty()) ++dropped_count_;
 }
 
 void AhoCorasickCPU::apply_policy_cb(

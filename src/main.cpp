@@ -109,6 +109,8 @@ int main(int argc, char* argv[]) {
         pcfg.phrase_q_capacity = phrase_q_capacity;
         pipeline.run_parallel(run_dir, pcfg);
         auto pipeline_end = std::chrono::steady_clock::now();
+        std::cout << "Word finder dropped:    " << finder.dropped_count() << "\n";
+        std::cout << "Phrase scanner dropped: " << scanner.dropped_count() << "\n";
 
         if (run_analysis && !dry_run) {
             result_analyzer::analyze(run_dir);

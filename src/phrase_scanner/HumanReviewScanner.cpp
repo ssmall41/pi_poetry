@@ -39,6 +39,7 @@ std::vector<PhraseMatch> HumanReviewScanner::process_words(
         }
 
         if (phrase.words.size() >= min_phrase_length_) result.push_back(std::move(phrase));
+        else ++dropped_count_;
 
         i = j > i + 1 ? j : i + 1;  // skip merged words
     }
@@ -61,6 +62,7 @@ void HumanReviewScanner::process_words_streaming(
             if (gap != 0) {
                 if (pending_phrase_->words.size() >= min_phrase_length_)
                     on_phrase(std::move(*pending_phrase_));
+                else ++dropped_count_;
                 pending_phrase_.emplace();
                 pending_phrase_->start_offset = w.start;
                 pending_phrase_->words.push_back(w.word);
@@ -78,6 +80,7 @@ void HumanReviewScanner::flush_streaming(
     if (pending_phrase_) {
         if (pending_phrase_->words.size() >= min_phrase_length_)
             on_phrase(std::move(*pending_phrase_));
+        else ++dropped_count_;
         pending_phrase_.reset();
         pending_end_ = 0;
     }

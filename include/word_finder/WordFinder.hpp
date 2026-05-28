@@ -30,4 +30,5 @@ public:
     virtual void load_dictionary(const std::string& path) = 0;
 
     virtual void set_overlap_policy(OverlapPolicy policy) = 0;
+    virtual std::size_t dropped_count() const = 0;
 };
