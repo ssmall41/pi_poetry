@@ -217,7 +217,6 @@ TEST(DigitSeqIntegration, EndToEnd_Min2_KeepsTwoWordPhrases) {
     ASSERT_EQ(chains.size(), 1u);
 
     HumanReviewScanner hs;
-    hs.set_min_phrase_length(2);
     auto phrases = hs.process_words(chains[0]);
     ASSERT_EQ(phrases.size(), 1u);
     EXPECT_EQ(phrases[0].words, (std::vector<std::string>{"cat", "dog"}));
@@ -231,7 +230,6 @@ TEST(DigitSeqIntegration, EndToEnd_Min3_FiltersTwoWordPhrases) {
     ac.set_min_phrase_length(3);
 
     HumanReviewScanner hs;
-    hs.set_min_phrase_length(3);
 
     auto chains = ac.scan(letters.data(), letters.size(), 0);
     std::vector<PhraseMatch> all_phrases;

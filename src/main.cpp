@@ -91,7 +91,6 @@ int main(int argc, char* argv[]) {
         finder.build();
         HumanReviewScanner scanner;
         finder.set_min_phrase_length(min_phrase_length);
-        scanner.set_min_phrase_length(min_phrase_length);
 
         Pipeline pipeline(source, mapper, finder, scanner);
         Pipeline::ParallelConfig pcfg;
