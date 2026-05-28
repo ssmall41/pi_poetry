@@ -57,7 +57,7 @@ Pi Poetry searches the decimal expansion of π for sequences of English words en
 
 **Inputs:** A plain-text file containing one ASCII decimal digit per byte (e.g. `data/pi_100000000.txt`).
 
-**Outputs:** Chunks of `uint8_t` values in the range 0–9, typically 131,072 digits per chunk. The chunk size is snapped up by the pipeline to a multiple of `digits_per_char` (2) so downstream stages always receive complete digit pairs.
+**Outputs:** Chunks of `uint8_t` values in the range 0–9, the number of which is configurable via `digit_source.chunk_size`. The chunk size is snapped up by the pipeline to a multiple of `digits_per_char` so downstream stages always receive complete digit sets.
 
 **Key interface methods:**
 
@@ -112,7 +112,7 @@ Example: digits `3`, `1` → value `31` → `31 % 26 = 5` → `'f'`
 
 ## Stage 3: Word Finder
 
-**Purpose:** Scan the character stream for all occurrences of dictionary words using an Aho-Corasick automaton, then resolve overlapping matches according to a configured policy.
+**Purpose:** Scan the character stream for all occurrences of dictionary words using an Aho-Corasick automaton, then resolve overlapping matches according to a configured policy. Currently, consecutive word chains are emitted, but this might change in the future.
 
 **Key files:**
 - [include/word_finder/WordFinder.hpp](../include/word_finder/WordFinder.hpp) — abstract interface
@@ -166,7 +166,7 @@ struct WordMatch {
 
 ## Stage 4: Phrase Scanner
 
-**Purpose:** Group directly consecutive word matches into phrases.
+**Purpose:** Group directly consecutive word matches into phrases. Currently, phrases are emitted from the Word Finder stage. This stage does not actually find phrases, but rather, processes them for final output. This might change in the future.
 
 **Key files:**
 - [include/phrase_scanner/PhraseScanner.hpp](../include/phrase_scanner/PhraseScanner.hpp) — abstract interface
@@ -282,7 +282,6 @@ Every queue shares the same capacity, set by `queue_capacity` in `ParallelConfig
 | `chunk_id` | `size_t` | Chunk index; matches the originating `ComboPackage`. |
 | `intra_chunk_seq_id` | `size_t` | Intra-chunk sequence index; mirrors the `ComboPackage` value. |
 | `final_package_in_chunk` | `bool` | `true` for the last package in a chunk; used by `ReorderBuffer` to drain in order. |
-| `text_strs` | `vector<string>` | Pre-serialized text lines, one per phrase (newline included). Built by the scanner worker. |
 | `json_strs` | `vector<string>` | Pre-serialized JSON objects, one per phrase (no comma or surrounding newline). Built by the scanner worker. |
 
 ---

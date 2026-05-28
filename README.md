@@ -77,7 +77,7 @@ The configuration file is a [TOML](https://toml.io/) document passed via `--conf
 | `type` * | `"aho-corasick-cpu"` | `"aho-corasick-cpu"` | Word-finder implementation to use. |
 | `dictionary` | `"dictionaries/english.txt"` | Any file path | Path to the word list, one word per line. |
 | `overlap_policy` | `"earliest-then-longest"` | `"earliest-then-longest"`, `"all-combos"` | How to resolve overlapping word matches. `"earliest-then-longest"` greedily picks one non-overlapping sequence: the match starting soonest, with ties broken by longest word. `"all-combos"` enumerates every possible consecutive chain of non-overlapping words; use this to explore all valid readings. |
-| `min_word_length` | `3` | Positive integer | Words shorter than this are ignored when loading the dictionary. |
+| `min_word_length` | `1` | Positive integer | Words shorter than this are ignored when loading the dictionary. |
 | `threads` | `1` | Positive integer | Number of worker threads that scan letter packages for dictionary words. |
 | `queue_size` | `16` | Positive integer | Maximum number of combo packages buffered between the word finder and the phrase scanner. The word finder blocks when this limit is reached, applying back-pressure. |
 
@@ -86,6 +86,7 @@ The configuration file is a [TOML](https://toml.io/) document passed via `--conf
 | Field | Default | Valid Values | Description |
 |-------|---------|--------------|-------------|
 | `type` * | `"human-review"` | `"human-review"` | Phrase-scanner implementation to use. |
+| `min_phrase_length` | `1` | Positive integer | Minimum number of words a phrase must contain to be included in the output. Phrases shorter than this are silently discarded. |
 | `threads` | `1` | Positive integer | Number of worker threads that group word matches into phrases. |
 | `queue_size` | `16` | Positive integer | Maximum number of phrase packages buffered between the phrase scanner and the writer. The phrase scanner blocks when this limit is reached, applying back-pressure. |
 
