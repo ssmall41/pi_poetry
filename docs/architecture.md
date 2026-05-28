@@ -198,7 +198,7 @@ For each word:
 
 Only words with zero gap (touching) are grouped into the same phrase.
 
-**Streaming support:** In the parallel pipeline, phrases may span chunk boundaries. `process_words_streaming(batch, on_phrase)` accumulates a pending phrase across calls. `flush_streaming(on_phrase)` emits the final pending phrase at end-of-stream.
+**Streaming support:** In the **serial** pipeline, `process_words_streaming(batch, on_phrase)` and `flush_streaming(on_phrase)` are used to emit phrases one at a time without buffering the full result list. Each word chain is passed as a single batch followed immediately by a flush, so no accumulation across chunk boundaries occurs at the phrase layer. The parallel pipeline uses the non-streaming `process_words()` instead; because each chunk is scanned independently, phrases are bounded by chunk boundaries — two words that would form a phrase but fall in adjacent chunks will not be merged.
 
 ---
 
