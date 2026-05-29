@@ -1,5 +1,6 @@
 #include "pipeline/Pipeline.hpp"
 #include "pipeline/BoundedQueue.hpp"
+#include "pipeline/SpscQueue.hpp"
 #include "pipeline/WorkPackage.hpp"
 #include "pipeline/StageWorker.hpp"
 #include "pipeline/StageRunner.hpp"
@@ -261,8 +262,20 @@ void Pipeline::run_parallel(const std::filesystem::path& run_dir,
 
     BoundedQueue<DigitPackage>  digit_q(cfg.digit_q_capacity);
     BoundedQueue<LetterPackage> letter_q(cfg.letter_q_capacity);
-    BoundedQueue<ComboPackage>  combo_q(cfg.combo_q_capacity);
     BoundedQueue<PhrasePackage> phrase_q(cfg.phrase_q_capacity);
+
+    // One SPSC queue per word_finder thread. Create max(N, M) queues so that
+    // when scanner_threads > finder_threads, extra scanner threads each own at
+    // least one queue (immediately exhausted) and exit cleanly.
+    const int N = cfg.finder_threads;
+    const int M = cfg.scanner_threads;
+    const int Q = std::max(N, M);
+    const std::size_t per_q_cap = std::max<std::size_t>(1, cfg.combo_q_capacity / N);
+    std::vector<SpscQueue<ComboPackage>> combo_qs;
+    combo_qs.reserve(Q);
+    for (int i = 0; i < Q; ++i) combo_qs.emplace_back(per_q_cap);
+    // Extra queues (no finder thread writes to them) are immediately exhausted.
+    for (int i = N; i < Q; ++i) combo_qs[i].set_done();
 
     // ── Stage 1: digit feeders ────────────────────────────────────────────────
     const std::size_t max_word_len = ac->max_word_length();
@@ -298,21 +311,55 @@ void Pipeline::run_parallel(const std::filesystem::path& run_dir,
         std::move(mapper_workers), digit_q, letter_q, cfg.debug);
     mapper_runner.start();
 
-    // ── Stage 3: word_finder workers (scan + apply overlap policy) ───────────
-    std::vector<std::unique_ptr<StageWorker<LetterPackage, ComboPackage>>> finder_workers;
-    for (int i = 0; i < cfg.finder_threads; ++i)
-        finder_workers.push_back(std::make_unique<WordFinderWorker>(*ac, cfg.write_letters));
-    StageRunner<LetterPackage, ComboPackage> finder_runner(
-        std::move(finder_workers), letter_q, combo_q, cfg.debug);
-    finder_runner.start();
+    // ── Stage 3: word_finder workers — each pushes to its own SpscQueue ────────
+    std::vector<std::thread> finder_threads_vec;
+    finder_threads_vec.reserve(N);
+    for (int i = 0; i < N; ++i) {
+        finder_threads_vec.emplace_back([&, i] {
+            WordFinderWorker worker(*ac, cfg.write_letters);
+            LetterPackage pkg;
+            while (letter_q.pop(pkg)) {
+                worker.process(std::move(pkg),
+                    [&](ComboPackage cp) { combo_qs[i].push(std::move(cp)); });
+            }
+            combo_qs[i].set_done();
+        });
+    }
 
-    // ── Stage 4: phrase_scanner workers ──────────────────────────────────────
-    std::vector<std::unique_ptr<StageWorker<ComboPackage, PhrasePackage>>> scanner_workers;
-    for (int i = 0; i < cfg.scanner_threads; ++i)
-        scanner_workers.push_back(std::make_unique<PhraseScannerWorker>(*hs));
-    StageRunner<ComboPackage, PhrasePackage> scanner_runner(
-        std::move(scanner_workers), combo_q, phrase_q, cfg.debug);
-    scanner_runner.start();
+    // ── Stage 4: phrase_scanner workers — each polls its assigned SpscQueues ──
+    // Scanner thread j handles queues where queue_id % M == j (SPSC per queue).
+    std::atomic<int> active_scanners{M};
+    std::vector<std::thread> scanner_threads_vec;
+    scanner_threads_vec.reserve(M);
+    for (int j = 0; j < M; ++j) {
+        scanner_threads_vec.emplace_back([&, j] {
+            PhraseScannerWorker worker(*hs);
+            // Collect the indices of queues owned by this scanner thread.
+            std::vector<int> owned;
+            for (int q = j; q < Q; q += M) owned.push_back(q);
+
+            std::vector<bool> exhausted_flags(owned.size(), false);
+            int remaining = static_cast<int>(owned.size());
+            std::size_t cursor = 0;
+            while (remaining > 0) {
+                const std::size_t idx = cursor % owned.size();
+                cursor++;
+                if (exhausted_flags[idx]) continue;
+                ComboPackage pkg;
+                if (combo_qs[owned[idx]].pop(pkg)) {
+                    worker.process(std::move(pkg),
+                        [&](PhrasePackage pp) { phrase_q.push(std::move(pp)); });
+                } else if (combo_qs[owned[idx]].is_exhausted()) {
+                    exhausted_flags[idx] = true;
+                    --remaining;
+                } else {
+                    std::this_thread::yield();
+                }
+            }
+            if (active_scanners.fetch_sub(1) == 1)
+                phrase_q.set_done();
+        });
+    }
 
     // ── Writer thread: reorder buffer → disk ─────────────────────────────────
     const std::string json_path = cfg.dry_run ? "/dev/null" : (run_dir / "results.json").string();
@@ -357,8 +404,8 @@ void Pipeline::run_parallel(const std::filesystem::path& run_dir,
     // ── Join all threads ──────────────────────────────────────────────────────
     for (auto& t : feeder_threads) t.join();
     mapper_runner.join();
-    finder_runner.join();
-    scanner_runner.join();
+    for (auto& t : finder_threads_vec) t.join();
+    for (auto& t : scanner_threads_vec) t.join();
     writer_thread.join();
 
     if (letters_out.is_open())

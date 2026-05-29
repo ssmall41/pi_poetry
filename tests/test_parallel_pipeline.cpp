@@ -255,6 +255,111 @@ TEST(ParallelPipeline, LettersFileContainsExpectedContent_MultiChunk) {
     EXPECT_EQ(contents, "fphab\n");
 }
 
+// ── Cycle 7: finder_threads == scanner_threads (1:1 SPSC queues) ─────────────
+
+TEST(ParallelPipeline, SpscQueues_FinderEqualsScanner) {
+    const std::string pi   = PI_POETRY_SOURCE_DIR "/data/pi_2000.txt";
+    const std::string dict = PI_POETRY_SOURCE_DIR "/dictionaries/english_trimmed.txt";
+
+    auto serial_dir   = std::filesystem::temp_directory_path() / "pp_spsc_eq_serial";
+    auto parallel_dir = std::filesystem::temp_directory_path() / "pp_spsc_eq_parallel";
+    std::filesystem::create_directories(serial_dir);
+    std::filesystem::create_directories(parallel_dir);
+
+    {
+        FileDigitSource source(pi); TwoDigitBlockMapper mapper;
+        AhoCorasickCPU finder; finder.set_overlap_policy(OverlapPolicy::AllCombos);
+        finder.load_dictionary(dict); finder.build();
+        HumanReviewScanner scanner;
+        Pipeline{source, mapper, finder, scanner}.run(serial_dir);
+    }
+    {
+        FileDigitSource source(pi); TwoDigitBlockMapper mapper;
+        AhoCorasickCPU finder; finder.set_overlap_policy(OverlapPolicy::AllCombos);
+        finder.load_dictionary(dict); finder.build();
+        HumanReviewScanner scanner;
+        Pipeline::ParallelConfig cfg;
+        cfg.chunk_size      = 8192;
+        cfg.finder_threads  = 3;
+        cfg.scanner_threads = 3;  // equal: 3 SPSC queues
+        Pipeline{source, mapper, finder, scanner}.run_parallel(parallel_dir, cfg);
+    }
+
+    auto s = parse_phrases(serial_dir), p = parse_phrases(parallel_dir);
+    std::filesystem::remove_all(serial_dir); std::filesystem::remove_all(parallel_dir);
+    EXPECT_EQ(s, p);
+}
+
+// ── Cycle 8: scanner_threads > finder_threads (extra scanners get empty queues)
+
+TEST(ParallelPipeline, SpscQueues_MoreScannersThanFinders) {
+    const std::string pi   = PI_POETRY_SOURCE_DIR "/data/pi_2000.txt";
+    const std::string dict = PI_POETRY_SOURCE_DIR "/dictionaries/english_trimmed.txt";
+
+    auto serial_dir   = std::filesystem::temp_directory_path() / "pp_spsc_ms_serial";
+    auto parallel_dir = std::filesystem::temp_directory_path() / "pp_spsc_ms_parallel";
+    std::filesystem::create_directories(serial_dir);
+    std::filesystem::create_directories(parallel_dir);
+
+    {
+        FileDigitSource source(pi); TwoDigitBlockMapper mapper;
+        AhoCorasickCPU finder; finder.set_overlap_policy(OverlapPolicy::AllCombos);
+        finder.load_dictionary(dict); finder.build();
+        HumanReviewScanner scanner;
+        Pipeline{source, mapper, finder, scanner}.run(serial_dir);
+    }
+    {
+        FileDigitSource source(pi); TwoDigitBlockMapper mapper;
+        AhoCorasickCPU finder; finder.set_overlap_policy(OverlapPolicy::AllCombos);
+        finder.load_dictionary(dict); finder.build();
+        HumanReviewScanner scanner;
+        Pipeline::ParallelConfig cfg;
+        cfg.chunk_size      = 8192;
+        cfg.finder_threads  = 2;
+        cfg.scanner_threads = 4;  // more scanners than queues
+        Pipeline{source, mapper, finder, scanner}.run_parallel(parallel_dir, cfg);
+    }
+
+    auto s = parse_phrases(serial_dir), p = parse_phrases(parallel_dir);
+    std::filesystem::remove_all(serial_dir); std::filesystem::remove_all(parallel_dir);
+    EXPECT_EQ(s, p);
+}
+
+// ── Cycle 9: finder_threads > scanner_threads (some scanners own 2+ queues) ──
+
+TEST(ParallelPipeline, SpscQueues_MoreFindersThanScanners) {
+    const std::string pi   = PI_POETRY_SOURCE_DIR "/data/pi_2000.txt";
+    const std::string dict = PI_POETRY_SOURCE_DIR "/dictionaries/english_trimmed.txt";
+
+    auto serial_dir   = std::filesystem::temp_directory_path() / "pp_spsc_mf_serial";
+    auto parallel_dir = std::filesystem::temp_directory_path() / "pp_spsc_mf_parallel";
+    std::filesystem::create_directories(serial_dir);
+    std::filesystem::create_directories(parallel_dir);
+
+    {
+        FileDigitSource source(pi); TwoDigitBlockMapper mapper;
+        AhoCorasickCPU finder; finder.set_overlap_policy(OverlapPolicy::AllCombos);
+        finder.load_dictionary(dict); finder.build();
+        HumanReviewScanner scanner;
+        Pipeline{source, mapper, finder, scanner}.run(serial_dir);
+    }
+    {
+        FileDigitSource source(pi); TwoDigitBlockMapper mapper;
+        AhoCorasickCPU finder; finder.set_overlap_policy(OverlapPolicy::AllCombos);
+        finder.load_dictionary(dict); finder.build();
+        HumanReviewScanner scanner;
+        Pipeline::ParallelConfig cfg;
+        cfg.chunk_size      = 8192;
+        cfg.finder_threads  = 5;
+        cfg.scanner_threads = 2;  // each scanner owns ~2-3 queues
+        Pipeline{source, mapper, finder, scanner}.run_parallel(parallel_dir, cfg);
+    }
+
+    auto s = parse_phrases(serial_dir), p = parse_phrases(parallel_dir);
+    std::filesystem::remove_all(serial_dir); std::filesystem::remove_all(parallel_dir);
+    EXPECT_EQ(s, p);
+}
+
 // ── AllCombos parallel matches serial (set-equality) ─────────────────────────
 
 TEST(ParallelPipeline, ParallelMatchesSerial_AllCombos) {

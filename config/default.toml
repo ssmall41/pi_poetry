@@ -8,7 +8,7 @@ dry_run = false
 
 [digit_source]
 type = "file"
-path = "data/pi_1000000.txt"
+path = "data/pi_long_test_1e8_3.txt"
 threads = 1
 chunk_size = 32768
 queue_size = 16
@@ -26,8 +26,8 @@ type = "aho-corasick-cpu"
 dictionary = "dictionaries/google-10000-english-trimmed.txt"
 overlap_policy = "all-combos"
 min_word_length = 1
-threads = 1
-queue_size = 16
+threads = 6
+queue_size = 10000
 
 [phrase_scanner]
 type = "human-review"
@@ -36,4 +36,4 @@ threads = 1
 queue_size = 16
 
 [analysis]
-run_after_pipeline = true
+run_after_pipeline = false

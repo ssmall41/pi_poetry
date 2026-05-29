@@ -107,6 +107,7 @@ add_executable(pi_poetry_tests
     tests/test_bounded_queue.cpp
     tests/test_parallel_pipeline.cpp
     tests/test_reorder_buffer.cpp
+    tests/test_spsc_queue.cpp
 )
 target_link_libraries(pi_poetry_tests PRIVATE
     digit_source_lib digit_mapper_lib word_finder_lib phrase_scanner_lib
