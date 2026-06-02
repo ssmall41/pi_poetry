@@ -44,6 +44,7 @@ build/
 Build/
 build-*/
 build_perf/
+build_release/
 
 # CMake generated files
 CMakeFiles/
