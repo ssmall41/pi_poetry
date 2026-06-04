@@ -21,6 +21,30 @@ Supply a plain-text file of pi digits (one ASCII digit per byte) at `data/pi_dig
 
 Each run creates a timestamped subfolder (e.g. `outputs/run-20260506_143022/`) containing `results.json`. If `write_letter_sequence = true` in the `[digit_mapper]` config, `letter_sequence.txt` is also written. The output directory is configurable in `config/default.toml`.
 
+### Downloading digits from an online API
+
+Instead of a local file, you can stream digits directly from an HTTP/HTTPS API. Set `digit_source.type = "api"` and point `source_config` at a per-source TOML file that describes the API. A ready-made config for [api.pi.delivery](https://api.pi.delivery) is included:
+
+```toml
+[digit_source]
+type          = "api"
+source_config = "config/sources/pi_delivery.toml"
+max_digits    = 100000   # 0 = run indefinitely
+threads       = 4
+```
+
+Multiple feeder threads download different chunks in parallel (each request specifies a start offset). The `api.pi.delivery` API allows up to 1,000 digits per request; the pipeline issues as many requests as needed to fill each chunk.
+
+### Graceful stop (indefinite runs)
+
+When `max_digits = 0` the pipeline runs until interrupted. To stop gracefully — letting in-flight chunks finish before the pipeline drains and exits — create a file named `pi_poetry.stop` in the working directory:
+
+```bash
+touch pi_poetry.stop
+```
+
+The pipeline detects this file between chunks, stops fetching new data, drains the remaining stages, and deletes `pi_poetry.stop` when done.
+
 ## Running Tests
 
 ```bash
@@ -53,9 +77,11 @@ The configuration file is a [TOML](https://toml.io/) document passed via `--conf
 
 | Field | Default | Valid Values | Description |
 |-------|---------|--------------|-------------|
-| `type` * | `"file"` | `"file"` | Digit source implementation to use. |
-| `path` | `"data/pi_2000.txt"` | Any file path | Plain-text file of pi digits, one ASCII digit per byte. |
-| `threads` | `1` | Positive integer | Number of worker threads that read digit chunks from the source and push them into the pipeline. |
+| `type` | `"file"` | `"file"`, `"api"` | Digit source implementation to use. `"file"` reads from a local plain-text file; `"api"` downloads from an HTTP/HTTPS API described by `source_config`. |
+| `path` | `"data/pi_2000.txt"` | Any file path | *(type = "file" only)* Plain-text file of pi digits, one ASCII digit per byte. |
+| `source_config` | — | Any file path | *(type = "api" only)* Path to a per-source TOML file describing the API endpoint (see `config/sources/pi_delivery.toml` for an example). |
+| `max_digits` | `0` | Integer ≥ 0 | Maximum digits to process. `0` means no cap (reads the full file, or runs indefinitely for API sources). Applies to both `"file"` and `"api"` sources. |
+| `threads` | `1` | Positive integer | Number of worker threads that read digit chunks from the source and push them into the pipeline. For `"api"` sources, each thread downloads independently. |
 | `chunk_size` | `131072` | Positive integer | Number of digits each worker reads per work package. Values that are not a multiple of `digits_per_char` (2 for the default mapper) are silently rounded up. Larger chunks reduce coordination overhead; smaller chunks increase parallelism granularity. |
 | `queue_size` | `16` | Positive integer | Maximum number of digit packages buffered between the digit source and the digit mapper. The digit source blocks when this limit is reached, applying back-pressure. |
 
@@ -125,7 +151,7 @@ tests/           Google Test unit and integration tests
 
 ### pi_download
 
-Downloads digits of pi from the [pi.delivery](https://pi.delivery) API and writes them to a plain-text file in the `data/` directory, ready for use with the main pipeline.
+Downloads digits of pi from the [pi.delivery](https://pi.delivery) API and writes them to a plain-text file in the `data/` directory, ready for use with the main pipeline. Alternatively, the main pipeline can download digits on-the-fly using `digit_source.type = "api"` (see above), without needing a pre-downloaded file.
 
 **Compile:**
 

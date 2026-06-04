@@ -258,3 +258,89 @@ TEST(DigitDispatcher, ConcurrentNextProducesUniqueSeqIds) {
     for (auto& pkg : collected) ids.insert(pkg.seq_id);
     EXPECT_EQ(ids.size(), 10u);  // all seq_ids unique
 }
+
+// ── DigitDispatcher max_digits cap ───────────────────────────────────────────
+
+TEST(DigitDispatcher_MaxDigits, StopsAtCap) {
+    // File has 14 digits; cap at 10 with chunk_size=6 → 2 chunks then stop
+    auto p = make_temp_digit_file("12345678901234");
+    FileDigitSource src(p.string());
+    DigitDispatcher disp(src, /*chunk_size=*/6, /*lookahead_digits=*/0, /*max_digits=*/10);
+
+    auto pkg0 = disp.next();
+    ASSERT_TRUE(pkg0.has_value());
+    EXPECT_EQ(pkg0->seq_id, 0u);
+    EXPECT_EQ(pkg0->global_digit_offset, 0u);
+    EXPECT_EQ(pkg0->num_real_digits, 6u);
+
+    auto pkg1 = disp.next();
+    ASSERT_TRUE(pkg1.has_value());
+    EXPECT_EQ(pkg1->seq_id, 1u);
+    EXPECT_EQ(pkg1->global_digit_offset, 6u);
+    EXPECT_EQ(pkg1->num_real_digits, 4u);  // clamped: 10 - 6 = 4
+
+    EXPECT_FALSE(disp.next().has_value());
+}
+
+TEST(DigitDispatcher_MaxDigits, StopsAtCapWithLookahead) {
+    // Same as above but with lookahead=2; lookahead doesn't affect num_real_digits
+    auto p = make_temp_digit_file("12345678901234");
+    FileDigitSource src(p.string());
+    DigitDispatcher disp(src, /*chunk_size=*/6, /*lookahead_digits=*/2, /*max_digits=*/10);
+
+    auto pkg0 = disp.next();
+    ASSERT_TRUE(pkg0.has_value());
+    EXPECT_EQ(pkg0->num_real_digits, 6u);
+    EXPECT_EQ(pkg0->digits.size(), 8u);    // 6 real + 2 lookahead
+
+    auto pkg1 = disp.next();
+    ASSERT_TRUE(pkg1.has_value());
+    EXPECT_EQ(pkg1->num_real_digits, 4u);  // clamped real portion
+
+    EXPECT_FALSE(disp.next().has_value());
+}
+
+TEST(DigitDispatcher_MaxDigits, ZeroMeansNoCap) {
+    auto p = make_temp_digit_file("1234567890");
+    FileDigitSource src(p.string());
+    DigitDispatcher disp(src, /*chunk_size=*/5, /*lookahead_digits=*/0, /*max_digits=*/0);
+
+    auto pkg0 = disp.next();
+    ASSERT_TRUE(pkg0.has_value());
+    EXPECT_EQ(pkg0->num_real_digits, 5u);
+
+    auto pkg1 = disp.next();
+    ASSERT_TRUE(pkg1.has_value());
+    EXPECT_EQ(pkg1->num_real_digits, 5u);
+
+    EXPECT_FALSE(disp.next().has_value());
+}
+
+TEST(DigitDispatcher_MaxDigits, CapLargerThanSourceRunsToEof) {
+    auto p = make_temp_digit_file("1234567890");  // 10 digits
+    FileDigitSource src(p.string());
+    DigitDispatcher disp(src, /*chunk_size=*/5, /*lookahead_digits=*/0, /*max_digits=*/99999);
+
+    auto pkg0 = disp.next();
+    ASSERT_TRUE(pkg0.has_value());
+    EXPECT_EQ(pkg0->num_real_digits, 5u);
+
+    auto pkg1 = disp.next();
+    ASSERT_TRUE(pkg1.has_value());
+    EXPECT_EQ(pkg1->num_real_digits, 5u);
+
+    EXPECT_FALSE(disp.next().has_value());
+}
+
+TEST(DigitDispatcher_MaxDigits, CapExactlyOnChunkBoundary) {
+    // max_digits=6, chunk_size=6 → exactly one chunk, then stop
+    auto p = make_temp_digit_file("123456789");
+    FileDigitSource src(p.string());
+    DigitDispatcher disp(src, /*chunk_size=*/6, /*lookahead_digits=*/0, /*max_digits=*/6);
+
+    auto pkg0 = disp.next();
+    ASSERT_TRUE(pkg0.has_value());
+    EXPECT_EQ(pkg0->num_real_digits, 6u);
+
+    EXPECT_FALSE(disp.next().has_value());
+}

@@ -8,7 +8,7 @@ dry_run = false
 
 [digit_source]
 type = "file"
-path = "data/pi_1000000.txt"
+path = "data/pi_1p5e9.txt"
 threads = 1
 chunk_size = 32768
 queue_size = 16
