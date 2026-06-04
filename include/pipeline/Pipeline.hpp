@@ -20,6 +20,7 @@ public:
 
     struct ParallelConfig {
         std::size_t chunk_size       = 131072;
+        uint64_t    max_digits       = 0;
         bool        write_letters    = false;
         int         digit_threads    = 1;
         int         mapper_threads   = 1;

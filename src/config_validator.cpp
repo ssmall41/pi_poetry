@@ -42,7 +42,29 @@ std::vector<std::string> validate_config(const toml::table& config) {
         if (mode != "serial" && mode != "parallel")
             errors.push_back("pipeline.mode: must be \"serial\" or \"parallel\", got \"" + mode + "\"");
     }
-    check_reserved_str("digit_source",  "type",     "file");
+    {
+        std::string dtype = config["digit_source"]["type"].value_or(std::string("file"));
+        if (dtype != "file" && dtype != "api")
+            errors.push_back("digit_source.type: must be \"file\" or \"api\", got \""
+                             + dtype + "\"");
+
+        if (dtype == "file") {
+            std::string path = config["digit_source"]["path"]
+                                   .value_or(std::string("data/pi_2000.txt"));
+            if (!std::filesystem::exists(path))
+                errors.push_back("digit_source.path: file not found: \"" + path + "\"");
+        }
+        if (dtype == "api") {
+            std::string sc = config["digit_source"]["source_config"].value_or(std::string(""));
+            if (sc.empty())
+                errors.push_back("digit_source.source_config: required when type is \"api\"");
+            else if (!std::filesystem::exists(sc))
+                errors.push_back("digit_source.source_config: file not found: \"" + sc + "\"");
+        }
+        auto md = config["digit_source"]["max_digits"].value<int64_t>();
+        if (md && *md < 0)
+            errors.push_back("digit_source.max_digits: must be >= 0");
+    }
     check_reserved_str("digit_mapper",  "type",     "two-digit-block");
     check_reserved_str("digit_mapper",  "alphabet", "alpha-lower");
     check_reserved_str("word_finder",   "type",     "aho-corasick-cpu");
@@ -97,13 +119,6 @@ std::vector<std::string> validate_config(const toml::table& config) {
                              std::to_string(*v));
         else if (!v && config["phrase_scanner"]["min_phrase_length"])
             errors.push_back("phrase_scanner.min_phrase_length: must be an integer >= 1");
-    }
-
-    {
-        std::string path = config["digit_source"]["path"]
-                               .value_or(std::string("data/pi_2000.txt"));
-        if (!std::filesystem::exists(path))
-            errors.push_back("digit_source.path: file not found: \"" + path + "\"");
     }
 
     {

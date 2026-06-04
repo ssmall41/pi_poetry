@@ -1,0 +1,8 @@
+[api]
+base_url        = "https://api.pi.delivery/v1/pi"
+start_param     = "start"
+count_param     = "numberOfDigits"
+max_per_request = 1000
+
+[response]
+digits_json_field = "content"

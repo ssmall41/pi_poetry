@@ -1,5 +1,7 @@
 #include "config_validator.hpp"
 #include <gtest/gtest.h>
+#include <fstream>
+#include <filesystem>
 #include <string>
 
 // Builds a fully valid toml::table using real paths from the source tree.
@@ -321,4 +323,127 @@ TEST(ConfigValidator, MinPhraseLengthWrongTypeIsInvalid) {
     auto errors = validate_config(cfg);
     ASSERT_EQ(errors.size(), 1u);
     EXPECT_TRUE(any_error_contains(errors, "phrase_scanner.min_phrase_length"));
+}
+
+// ── digit_source type = "api" ─────────────────────────────────────────────────
+
+static std::filesystem::path make_temp_api_source_config() {
+    auto p = std::filesystem::temp_directory_path() / "pi_test_api_source.toml";
+    std::ofstream f(p);
+    f << "[api]\n"
+         "base_url        = \"http://localhost\"\n"
+         "start_param     = \"start\"\n"
+         "count_param     = \"n\"\n"
+         "max_per_request = 1000\n\n"
+         "[response]\n"
+         "digits_json_field = \"content\"\n";
+    return p;
+}
+
+static toml::table make_valid_api_table() {
+    auto sc_path = make_temp_api_source_config();
+    return toml::parse(
+        "[pipeline]\n"
+        "mode = \"serial\"\n"
+        "\n"
+        "[digit_source]\n"
+        "type          = \"api\"\n"
+        "source_config = \"" + sc_path.string() + "\"\n"
+        "threads       = 1\n"
+        "\n"
+        "[digit_mapper]\n"
+        "type     = \"two-digit-block\"\n"
+        "alphabet = \"alpha-lower\"\n"
+        "base     = 10\n"
+        "threads  = 1\n"
+        "\n"
+        "[word_finder]\n"
+        "type            = \"aho-corasick-cpu\"\n"
+        "dictionary      = \"" PI_POETRY_SOURCE_DIR "/dictionaries/english.txt\"\n"
+        "overlap_policy  = \"earliest-then-longest\"\n"
+        "min_word_length = 1\n"
+        "threads         = 1\n"
+        "\n"
+        "[phrase_scanner]\n"
+        "type    = \"human-review\"\n"
+        "mode    = \"gap-tolerant\"\n"
+        "max_gap = 0\n"
+        "threads = 1\n"
+        "\n"
+        "[output]\n"
+        "dir = \"outputs\"\n"
+    );
+}
+
+TEST(ConfigValidator, ApiTypeIsValid) {
+    auto cfg = make_valid_api_table();
+    EXPECT_TRUE(validate_config(cfg).empty());
+}
+
+TEST(ConfigValidator, ApiTypeMissingSourceConfigIsInvalid) {
+    auto cfg = make_valid_api_table();
+    cfg["digit_source"].as_table()->erase("source_config");
+    auto errors = validate_config(cfg);
+    ASSERT_GE(errors.size(), 1u);
+    EXPECT_TRUE(any_error_contains(errors, "digit_source.source_config"));
+}
+
+TEST(ConfigValidator, ApiTypeSourceConfigMissingFileIsInvalid) {
+    auto cfg = make_valid_api_table();
+    cfg["digit_source"].as_table()->insert_or_assign("source_config",
+                                                     "/nonexistent/source.toml");
+    auto errors = validate_config(cfg);
+    ASSERT_GE(errors.size(), 1u);
+    EXPECT_TRUE(any_error_contains(errors, "digit_source.source_config"));
+}
+
+TEST(ConfigValidator, FileTypePathNotCheckedForApiType) {
+    auto cfg = make_valid_api_table();
+    // No "path" field present — must not produce an error for type = "api"
+    cfg["digit_source"].as_table()->erase("path");
+    EXPECT_TRUE(validate_config(cfg).empty());
+}
+
+TEST(ConfigValidator, InvalidTypeNeitherFileNorApi) {
+    auto cfg = make_valid_table();
+    cfg["digit_source"].as_table()->insert_or_assign("type", "stream");
+    auto errors = validate_config(cfg);
+    ASSERT_EQ(errors.size(), 1u);
+    EXPECT_TRUE(any_error_contains(errors, "digit_source.type"));
+    EXPECT_TRUE(any_error_contains(errors, "file"));
+    EXPECT_TRUE(any_error_contains(errors, "api"));
+}
+
+// ── digit_source.max_digits ───────────────────────────────────────────────────
+
+TEST(ConfigValidator, MaxDigitsZeroIsValid) {
+    auto cfg = make_valid_table();
+    cfg["digit_source"].as_table()->insert_or_assign("max_digits", int64_t{0});
+    EXPECT_TRUE(validate_config(cfg).empty());
+}
+
+TEST(ConfigValidator, MaxDigitsPositiveIsValid) {
+    auto cfg = make_valid_table();
+    cfg["digit_source"].as_table()->insert_or_assign("max_digits", int64_t{100000});
+    EXPECT_TRUE(validate_config(cfg).empty());
+}
+
+TEST(ConfigValidator, MaxDigitsNegativeIsInvalid) {
+    auto cfg = make_valid_table();
+    cfg["digit_source"].as_table()->insert_or_assign("max_digits", int64_t{-1});
+    auto errors = validate_config(cfg);
+    ASSERT_EQ(errors.size(), 1u);
+    EXPECT_TRUE(any_error_contains(errors, "digit_source.max_digits"));
+}
+
+TEST(ConfigValidator, MaxDigitsSetForFileTypeIsValid) {
+    auto cfg = make_valid_table();
+    cfg["digit_source"].as_table()->insert_or_assign("max_digits", int64_t{5000});
+    EXPECT_TRUE(validate_config(cfg).empty());
+}
+
+TEST(ConfigValidator, MaxDigitsSetForApiTypeIsValid) {
+    auto cfg = make_valid_api_table();
+    cfg["digit_source"].as_table()->insert_or_assign("max_digits", int64_t{5000});
+    EXPECT_TRUE(validate_config(cfg).empty());
 }

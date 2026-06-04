@@ -7,9 +7,9 @@ Pi Poetry searches the decimal expansion of π for sequences of English words en
 ## Pipeline Diagram
 
 ```
-  pi digits file
+  pi digits (file or API)
         │
-        │ pread()
+        │ read_at()
         ▼
 ┌─────────────────────┐
 │   Digit Feeder      │  × digit_threads
@@ -48,14 +48,16 @@ Pi Poetry searches the decimal expansion of π for sequences of English words en
 
 ## Stage 1: Digit Source
 
-**Purpose:** Read the raw digit file and emit fixed-size chunks of digit values to the rest of the pipeline.
+**Purpose:** Produce fixed-size chunks of digit values (0–9) for the rest of the pipeline. Digits may come from a local file or be downloaded from an HTTP/HTTPS API.
 
 **Key files:**
 - [include/digit_source/DigitSource.hpp](../include/digit_source/DigitSource.hpp) — abstract interface
-- [include/digit_source/FileDigitSource.hpp](../include/digit_source/FileDigitSource.hpp)
+- [include/digit_source/FileDigitSource.hpp](../include/digit_source/FileDigitSource.hpp) — reads from a local file via `pread`
 - [src/digit_source/FileDigitSource.cpp](../src/digit_source/FileDigitSource.cpp)
+- [include/digit_source/ApiDigitSource.hpp](../include/digit_source/ApiDigitSource.hpp) — downloads from an HTTP/HTTPS API
+- [src/digit_source/ApiDigitSource.cpp](../src/digit_source/ApiDigitSource.cpp)
 
-**Inputs:** A plain-text file containing one ASCII decimal digit per byte (e.g. `data/pi_100000000.txt`).
+**Inputs:** Either a plain-text file containing one ASCII decimal digit per byte, or an HTTP/HTTPS API described by a per-source TOML config (see `config/sources/pi_delivery.toml`).
 
 **Outputs:** Chunks of `uint8_t` values in the range 0–9, the number of which is configurable via `digit_source.chunk_size`. The chunk size is snapped up by the pipeline to a multiple of `digits_per_char` so downstream stages always receive complete digit sets.
 
@@ -64,13 +66,13 @@ Pi Poetry searches the decimal expansion of π for sequences of English words en
 | Method | Description |
 |---|---|
 | `next_chunk(buffer, n)` | Fill buffer with the next n digits; returns actual count written. Mutex-protected for thread safety. |
-| `read_at(offset, buffer, n)` | Random-access read at a given digit offset. Used by the parallel pipeline's `DigitDispatcher`. |
+| `read_at(offset, buffer, n)` | Random-access read at a given digit offset. Used by the parallel pipeline's `DigitDispatcher`. For `ApiDigitSource`, issues one or more HTTP requests starting at `offset`. |
 | `reset()` | Rewind to the beginning of the digit sequence. |
-| `is_finite()` | Returns `true`; file sources have a known end. |
-| `estimated_length()` | Returns total digit count. |
+| `is_finite()` | Returns `true` when a `max_digits` cap is configured; `false` for uncapped API sources. |
+| `estimated_length()` | Returns `max_digits` when set; `nullopt` for uncapped sources. |
 | `base()` | Returns `10` (decimal). |
 
-**Notes:** The file is opened with both an `ifstream` (for sequential reads) and a raw file descriptor (for `pread`-based random access). The parallel pipeline uses `read_at` exclusively so multiple feeder threads can read non-overlapping regions simultaneously.
+**Notes:** The parallel pipeline uses `read_at` exclusively, so multiple feeder threads read non-overlapping regions simultaneously. `FileDigitSource` implements this via `pread` (inherently thread-safe). `ApiDigitSource` constructs a separate HTTP client per call. Per-source API parameters (URL, query param names, response JSON field, max digits per request) are loaded from a TOML file at construction time.
 
 ---
 
@@ -296,9 +298,13 @@ For the mapper, word finder, and phrase scanner stages, threads are managed by `
 
 **Count:** `digit_source.threads` (default 1)
 
-Each feeder thread loops over `DigitDispatcher::next()`, which atomically claims the next chunk by incrementing a shared sequence counter and then reads the corresponding byte range from the source file via `read_at()` (using `pread`, which is safe for concurrent calls). The feeder appends the lookahead suffix (`max_word_length − 1` digit pairs), then pushes the completed `DigitPackage` to `digit_q`. When the dispatcher has no more chunks, the thread exits. The last feeder to exit calls `digit_q.set_done()`, unblocking any mapper threads waiting on the queue.
+Each feeder thread loops over `DigitDispatcher::next()`, which atomically claims the next chunk by incrementing a shared sequence counter and then reads the corresponding byte range from the source via `read_at()`. The feeder appends the lookahead suffix (`max_word_length − 1` digit pairs), then pushes the completed `DigitPackage` to `digit_q`. When the dispatcher has no more chunks (source exhausted or `max_digits` cap reached), the thread exits. The last feeder to exit calls `digit_q.set_done()`, unblocking any mapper threads waiting on the queue.
 
-Because `pread` allows multiple threads to read different offsets of the same file descriptor simultaneously, increasing `digit_threads` can improve throughput when reading from fast storage. In practice one feeder thread is rarely the bottleneck.
+**`max_digits` cap:** `DigitDispatcher` accepts an optional `max_digits` parameter. When set to a positive value, `next()` returns `std::nullopt` once `seq_id × chunk_size ≥ max_digits`, and clamps `num_real_digits` on the last boundary chunk. This applies uniformly to all source types.
+
+**Graceful stop (sentinel file):** Before each call to `DigitDispatcher::next()`, a feeder thread checks for the existence of `pi_poetry.stop` in the working directory. If found, it sets a shared `std::atomic<bool> stop_requested` flag (so all workers see the stop signal) and exits without pulling another chunk. After all feeder threads have joined and the pipeline has fully drained, the `pi_poetry.stop` file is deleted.
+
+For `FileDigitSource`, `pread` allows multiple threads to read different offsets of the same file descriptor simultaneously. For `ApiDigitSource`, each `read_at` call constructs its own HTTP client and issues independent requests, so multiple feeder threads download different portions in parallel.
 
 ### Digit Mapper Workers (`mapper_threads`)
 

@@ -1,3 +1,4 @@
+#include "digit_source/ApiDigitSource.hpp"
 #include "digit_source/FileDigitSource.hpp"
 #include "digit_mapper/TwoDigitBlockMapper.hpp"
 #include "word_finder/AhoCorasickCPU.hpp"
@@ -32,8 +33,9 @@ int main(int argc, char* argv[]) {
             return 1;
         }
 
-        std::string digit_path = config["digit_source"]["path"].value_or(
-            std::string("data/pi_2000.txt"));
+        std::string source_type = config["digit_source"]["type"].value_or(std::string("file"));
+        uint64_t max_digits = static_cast<uint64_t>(
+            config["digit_source"]["max_digits"].value_or(int64_t{0}));
         std::size_t chunk_size = static_cast<std::size_t>(
             config["digit_source"]["chunk_size"].value_or(int64_t{131072}));
         std::string dict_path = config["word_finder"]["dictionary"].value_or(
@@ -81,7 +83,18 @@ int main(int argc, char* argv[]) {
         std::size_t combo_q_capacity  = config["word_finder"]["queue_size"].value_or(16);
         std::size_t phrase_q_capacity = config["phrase_scanner"]["queue_size"].value_or(16);
 
-        FileDigitSource source(digit_path);
+        std::unique_ptr<DigitSource> source_ptr;
+        if (source_type == "file") {
+            std::string digit_path = config["digit_source"]["path"].value_or(
+                std::string("data/pi_2000.txt"));
+            source_ptr = std::make_unique<FileDigitSource>(digit_path);
+        } else {
+            std::string source_config = config["digit_source"]["source_config"].value_or(
+                std::string("config/sources/pi_delivery.toml"));
+            source_ptr = std::make_unique<ApiDigitSource>(source_config, max_digits);
+        }
+        DigitSource& source = *source_ptr;
+
         TwoDigitBlockMapper mapper;
         AhoCorasickCPU finder;
         finder.set_min_word_length(min_word_length);
@@ -95,6 +108,7 @@ int main(int argc, char* argv[]) {
         Pipeline pipeline(source, mapper, finder, scanner);
         Pipeline::ParallelConfig pcfg;
         pcfg.chunk_size      = chunk_size;
+        pcfg.max_digits      = max_digits;
         pcfg.write_letters   = write_letter_sequence;
         pcfg.digit_threads   = digit_threads;
         pcfg.mapper_threads  = mapper_threads;

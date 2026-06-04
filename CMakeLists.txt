@@ -27,13 +27,29 @@ FetchContent_Declare(
     URL https://github.com/yhirose/cpp-httplib/archive/refs/tags/v0.43.3.tar.gz
 )
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+# Disable httplib's non-blocking getaddrinfo: it spawns a std::thread per DNS
+# lookup, which creates one thread per HTTP request when keep-alive is not yet
+# established. Blocking getaddrinfo is fine here — DNS is OS-cached after the
+# first lookup per thread.
+set(HTTPLIB_USE_NON_BLOCKING_GETADDRINFO OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(nlohmann_json tomlplusplus googletest cpp-httplib)
 
 find_package(Threads REQUIRED)
 
 # ── Stage libraries ───────────────────────────────────────────────────────────
-add_library(digit_source_lib STATIC src/digit_source/FileDigitSource.cpp)
+add_library(digit_source_lib STATIC
+    src/digit_source/FileDigitSource.cpp
+    src/digit_source/ApiDigitSource.cpp
+)
 target_include_directories(digit_source_lib PUBLIC ${CMAKE_SOURCE_DIR}/include)
+target_link_libraries(digit_source_lib PUBLIC
+    httplib::httplib
+    nlohmann_json::nlohmann_json
+    tomlplusplus::tomlplusplus
+    OpenSSL::SSL
+    OpenSSL::Crypto
+    Threads::Threads)
+target_compile_definitions(digit_source_lib PUBLIC CPPHTTPLIB_OPENSSL_SUPPORT)
 target_compile_options(digit_source_lib PRIVATE -Wall -Wextra -Wpedantic)
 
 add_library(digit_mapper_lib STATIC src/digit_mapper/TwoDigitBlockMapper.cpp)
@@ -107,6 +123,8 @@ add_executable(pi_poetry_tests
     tests/test_bounded_queue.cpp
     tests/test_parallel_pipeline.cpp
     tests/test_reorder_buffer.cpp
+    tests/test_api_digit_source.cpp
+    tests/test_sentinel.cpp
 )
 target_link_libraries(pi_poetry_tests PRIVATE
     digit_source_lib digit_mapper_lib word_finder_lib phrase_scanner_lib

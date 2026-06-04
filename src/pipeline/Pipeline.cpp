@@ -268,14 +268,24 @@ void Pipeline::run_parallel(const std::filesystem::path& run_dir,
     const std::size_t max_word_len = ac->max_word_length();
     const std::size_t lookahead_digits =
         (max_word_len > 0 ? max_word_len - 1 : 0) * static_cast<std::size_t>(dpc);
-    DigitDispatcher dispatcher(source_, chunk_size, lookahead_digits);
-    std::atomic<int> active_feeders{cfg.digit_threads};
+    DigitDispatcher dispatcher(source_, chunk_size, lookahead_digits, cfg.max_digits);
+    std::atomic<int>  active_feeders{cfg.digit_threads};
+    std::atomic<bool> stop_requested{false};
+    static const std::filesystem::path kStopFile{"pi_poetry.stop"};
     std::mutex cout_mu;
     std::vector<std::thread> feeder_threads;
 
     for (int t = 0; t < cfg.digit_threads; ++t) {
         feeder_threads.emplace_back([&, t] {
-            while (auto pkg = dispatcher.next()) {
+            while (true) {
+                if (!stop_requested.load(std::memory_order_relaxed) &&
+                    std::filesystem::exists(kStopFile))
+                    stop_requested.store(true, std::memory_order_relaxed);
+                if (stop_requested.load(std::memory_order_relaxed)) break;
+
+                auto pkg = dispatcher.next();
+                if (!pkg) break;
+
                 if (cfg.debug) {
                     auto remaining = digit_q.size();
                     std::lock_guard<std::mutex> lk(cout_mu);
@@ -360,6 +370,11 @@ void Pipeline::run_parallel(const std::filesystem::path& run_dir,
     finder_runner.join();
     scanner_runner.join();
     writer_thread.join();
+
+    if (stop_requested.load()) {
+        std::error_code ec;
+        std::filesystem::remove(kStopFile, ec);
+    }
 
     if (letters_out.is_open())
         letters_out.put('\n');
