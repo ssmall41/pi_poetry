@@ -34,7 +34,7 @@ queue_size = 10000
 
 [phrase_scanner]
 type = "human-review"
-min_phrase_length = 1
+min_phrase_length = 3
 threads = 1
 queue_size = 1000
 
