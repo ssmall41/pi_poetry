@@ -17,9 +17,16 @@
 int main(int argc, char* argv[]) {
     auto start = std::chrono::steady_clock::now();
     std::string config_path = "config/default.toml";
-    for (int i = 1; i + 1 < argc; ++i) {
-        if (std::string(argv[i]) == "--config") {
-            config_path = argv[i + 1];
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg == "--help" || arg == "-h") {
+            std::cout << "Usage: " << argv[0] << " [options]\n"
+                      << "\nOptions:\n"
+                      << "  --config <path>   Path to TOML config file (default: config/default.toml)\n"
+                      << "  --help, -h        Show this help message\n";
+            return 0;
+        } else if (arg == "--config" && i + 1 < argc) {
+            config_path = argv[++i];
         }
     }
 
