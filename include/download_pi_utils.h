@@ -1,18 +1,26 @@
 #pragma once
-#include <algorithm>
+#include <cstdint>
+#include <filesystem>
 #include <fstream>
 #include <optional>
 #include <string>
 
-// Returns digits from the file (trailing newline stripped), or nullopt if the
-// file cannot be opened or contains non-digit characters.
-inline std::optional<std::string>
-read_and_validate_input_file(const std::string& path) {
-    std::ifstream in(path);
+// Returns the number of digits already in the file (file_size == digit_count
+// since no newlines are written), or nullopt if the file cannot be opened or
+// ends in whitespace. Returns 0 for an empty file.
+inline std::optional<int64_t>
+get_existing_digit_count(const std::string& path) {
+    std::error_code ec;
+    auto size = std::filesystem::file_size(path, ec);
+    if (ec) return std::nullopt;
+    if (size == 0) return int64_t{0};
+
+    std::ifstream in(path, std::ios::binary);
     if (!in) return std::nullopt;
-    std::string digits;
-    std::getline(in, digits);
-    if (!std::ranges::all_of(digits, [](unsigned char c) { return std::isdigit(c) != 0; }))
-        return std::nullopt;
-    return digits;
+    in.seekg(-1, std::ios::end);
+    char c;
+    if (!in.get(c)) return std::nullopt;
+    if (std::isspace(static_cast<unsigned char>(c))) return std::nullopt;
+
+    return static_cast<int64_t>(size);
 }

@@ -163,15 +163,20 @@ cmake --build build --parallel --target pi_download
 **Usage:**
 
 ```
-./build/pi_download <num_digits> [--output <path>]
+./build/pi_download <num_digits> [--file <path>] [--output <path>]
+./build/pi_download --help
 ```
 
 | Argument | Required | Description |
 |----------|----------|-------------|
-| `num_digits` | Yes | Total number of pi digits to download. |
-| `--output <path>` | No | Path to write the output file. Defaults to `data/pi_<num_digits>.txt`. |
+| `num_digits` | Yes | Total number of pi digits the output file should contain. Supports values beyond 2 billion. |
+| `--file <path>` | No | Append to an existing digit file. The file's size on disk determines the starting offset, so a previously interrupted run resumes automatically on the next invocation. |
+| `--output <path>` | No | Path for a fresh download (no existing file). Defaults to `data/pi_<num_digits>.txt`. |
+| `--help` | No | Print a usage summary and exit. |
 
-Digits are fetched in chunks of 1,000 (the API maximum per request) and progress is printed to stdout. If any request fails the program exits with an error and no file is written. The output is raw decimal digits with no punctuation (e.g. `31415926...`), one digit per byte, with a trailing newline — the format expected by the main pipeline.
+Digits are fetched in chunks of 1,000 (the API maximum per request). Progress is printed to stdout roughly every 2% of total chunks (~50 lines for a full run). If any request fails, the program exits and — when using `--file` — the file retains all digits written so far; re-running resumes from that point automatically.
+
+The output file contains raw decimal digits, one per byte, with no punctuation and no trailing newline (e.g. `31415926…`). File size equals digit count exactly.
 
 **Examples:**
 
@@ -181,6 +186,9 @@ Digits are fetched in chunks of 1,000 (the API maximum per request) and progress
 
 # Download 500 digits to a custom path
 ./build/pi_download 500 --output data/small.txt
+
+# Extend an existing file to 2 billion digits total
+./build/pi_download 2000000000 --file data/pi_1p5e9.txt
 ```
 
 In VSCode, use **Terminal > Run Task > Run: pi_download** — it will prompt for the digit count before running.
