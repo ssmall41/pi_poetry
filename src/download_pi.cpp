@@ -104,6 +104,7 @@ static bool download_pi(int64_t num_digits, int64_t start_offset,
     httplib::SSLClient client("api.pi.delivery");
     client.set_connection_timeout(30);
     client.set_read_timeout(30);
+    client.set_keep_alive(true);
 
     int64_t total_chunks = (num_digits + kChunkSize - 1) / kChunkSize;
     int64_t print_every = std::max(int64_t{1}, total_chunks / 50);
