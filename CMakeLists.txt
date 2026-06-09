@@ -52,7 +52,10 @@ target_link_libraries(digit_source_lib PUBLIC
 target_compile_definitions(digit_source_lib PUBLIC CPPHTTPLIB_OPENSSL_SUPPORT)
 target_compile_options(digit_source_lib PRIVATE -Wall -Wextra -Wpedantic)
 
-add_library(digit_mapper_lib STATIC src/digit_mapper/TwoDigitBlockMapper.cpp)
+add_library(digit_mapper_lib STATIC
+    src/digit_mapper/TwoDigitBlockMapper.cpp
+    src/digit_mapper/MappingFileMapper.cpp
+)
 target_include_directories(digit_mapper_lib PUBLIC ${CMAKE_SOURCE_DIR}/include)
 target_compile_options(digit_mapper_lib PRIVATE -Wall -Wextra -Wpedantic)
 
@@ -125,6 +128,7 @@ add_executable(pi_poetry_tests
     tests/test_reorder_buffer.cpp
     tests/test_api_digit_source.cpp
     tests/test_sentinel.cpp
+    tests/test_mapping_file_mapper.cpp
 )
 target_link_libraries(pi_poetry_tests PRIVATE
     digit_source_lib digit_mapper_lib word_finder_lib phrase_scanner_lib
