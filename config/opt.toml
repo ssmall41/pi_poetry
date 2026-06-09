@@ -15,8 +15,6 @@ queue_size = 16
 
 [digit_mapper]
 type = "two-digit-block"
-alphabet = "alpha-lower"
-base = 10
 threads = 1
 write_letter_sequence = false
 queue_size = 16

@@ -84,3 +84,6 @@ debug_letters.txt
 
 # Visual Studio Code settings
 .vscode
+
+# Config directories
+config/mappings/
