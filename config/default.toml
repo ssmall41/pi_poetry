@@ -17,7 +17,8 @@ chunk_size = 32768
 queue_size = 16
 
 [digit_mapper]
-type = "two-digit-block"
+type = "mapping-file"
+mapping_file = "config/mappings/two_digit_block.txt"
 alphabet = "alpha-lower"
 base = 10
 threads = 1

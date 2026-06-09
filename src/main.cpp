@@ -1,5 +1,6 @@
 #include "digit_source/ApiDigitSource.hpp"
 #include "digit_source/FileDigitSource.hpp"
+#include "digit_mapper/MappingFileMapper.hpp"
 #include "digit_mapper/TwoDigitBlockMapper.hpp"
 #include "word_finder/AhoCorasickCPU.hpp"
 #include "phrase_scanner/HumanReviewScanner.hpp"
@@ -102,7 +103,16 @@ int main(int argc, char* argv[]) {
         }
         DigitSource& source = *source_ptr;
 
-        TwoDigitBlockMapper mapper;
+        std::string mapper_type = config["digit_mapper"]["type"].value_or(std::string("two-digit-block"));
+        std::unique_ptr<DigitMapper> mapper_ptr;
+        if (mapper_type == "two-digit-block") {
+            mapper_ptr = std::make_unique<TwoDigitBlockMapper>();
+        } else {
+            std::string mf = config["digit_mapper"]["mapping_file"].value_or(std::string(""));
+            mapper_ptr = std::make_unique<MappingFileMapper>(std::filesystem::path(mf));
+        }
+        DigitMapper& mapper = *mapper_ptr;
+
         AhoCorasickCPU finder;
         finder.set_min_word_length(min_word_length);
         if (policy_str == "all-combos")

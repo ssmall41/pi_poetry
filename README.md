@@ -89,12 +89,34 @@ The configuration file is a [TOML](https://toml.io/) document passed via `--conf
 
 | Field | Default | Valid Values | Description |
 |-------|---------|--------------|-------------|
-| `type` * | `"two-digit-block"` | `"two-digit-block"` | Mapper implementation to use. |
-| `alphabet` * | `"alpha-lower"` | `"alpha-lower"` | Character set to map digit pairs into. |
-| `base` * | `10` | `10` | Numeric base of the digit stream. |
+| `type` | `"two-digit-block"` | `"two-digit-block"`, `"mapping-file"` | Mapper implementation to use. `"two-digit-block"` uses the built-in encoder; `"mapping-file"` loads the encoding from a plain-text file specified by `mapping_file`. |
+| `alphabet` * | `"alpha-lower"` | `"alpha-lower"` | *(type = "two-digit-block" only)* Character set to map digit pairs into. |
+| `base` * | `10` | `10` | *(type = "two-digit-block" only)* Numeric base of the digit stream. |
+| `mapping_file` | — | Any file path | *(type = "mapping-file" only)* Path to the mapping file (relative to the working directory). See below for the file format. |
 | `threads` | `1` | Positive integer | Number of worker threads that convert digit packages to letter packages. |
 | `write_letter_sequence` | `false` | `true`, `false` | When true, writes the mapped letter sequence to `letter_sequence.txt` in the run directory. |
 | `queue_size` | `16` | Positive integer | Maximum number of letter packages buffered between the digit mapper and the word finder. The digit mapper blocks when this limit is reached, applying back-pressure. |
+
+#### Mapping file format (`type = "mapping-file"`)
+
+A plain-text file with two header lines followed by one entry per line:
+
+```
+# Comments start with #; blank lines are ignored
+digits_per_char=2
+base=10
+00 a
+01 b
+...
+99 v
+```
+
+- **`digits_per_char`** — how many consecutive input digits produce one output character (must be ≥ 1).
+- **`base`** — numeric base of the digit stream (2–10). Must match the digit source.
+- **Entry lines** — `<combo> <char>`: the digit combination (exactly `digits_per_char` decimal digits, each in range 0–base−1) followed by a space and a single output character.
+- Every possible combination must appear exactly once (no missing, no duplicates). The mapper fails at startup with a descriptive error if the file is invalid.
+
+`config/mappings/two_digit_block.txt` is a ready-made mapping file that produces identical output to the built-in `"two-digit-block"` encoder.
 
 ### `[word_finder]`
 

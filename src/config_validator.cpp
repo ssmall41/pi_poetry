@@ -65,8 +65,22 @@ std::vector<std::string> validate_config(const toml::table& config) {
         if (md && *md < 0)
             errors.push_back("digit_source.max_digits: must be >= 0");
     }
-    check_reserved_str("digit_mapper",  "type",     "two-digit-block");
-    check_reserved_str("digit_mapper",  "alphabet", "alpha-lower");
+    {
+        std::string mtype = config["digit_mapper"]["type"].value_or(std::string("two-digit-block"));
+        if (mtype != "two-digit-block" && mtype != "mapping-file")
+            errors.push_back("digit_mapper.type: must be \"two-digit-block\" or \"mapping-file\", got \""
+                             + mtype + "\"");
+        if (mtype == "two-digit-block") {
+            check_reserved_str("digit_mapper", "alphabet", "alpha-lower");
+        }
+        if (mtype == "mapping-file") {
+            std::string mf = config["digit_mapper"]["mapping_file"].value_or(std::string(""));
+            if (mf.empty())
+                errors.push_back("digit_mapper.mapping_file: required when type is \"mapping-file\"");
+            else if (!std::filesystem::exists(mf))
+                errors.push_back("digit_mapper.mapping_file: file not found: \"" + mf + "\"");
+        }
+    }
     check_reserved_str("word_finder",   "type",     "aho-corasick-cpu");
     check_reserved_str("phrase_scanner","type",     "human-review");
 
@@ -89,7 +103,11 @@ std::vector<std::string> validate_config(const toml::table& config) {
         else if (!v && config["digit_source"]["chunk_size"])
             errors.push_back("digit_source.chunk_size: must be a positive integer");
     }
-    check_reserved_int("digit_mapper",  "base",    10);
+    {
+        std::string mtype = config["digit_mapper"]["type"].value_or(std::string("two-digit-block"));
+        if (mtype == "two-digit-block")
+            check_reserved_int("digit_mapper", "base", 10);
+    }
     check_threads("digit_mapper");
     check_threads("word_finder");
     check_threads("phrase_scanner");
