@@ -85,6 +85,10 @@ target_include_directories(config_validator_lib PUBLIC ${CMAKE_SOURCE_DIR}/inclu
 target_link_libraries(config_validator_lib PUBLIC tomlplusplus::tomlplusplus)
 target_compile_options(config_validator_lib PRIVATE -Wall -Wextra -Wpedantic)
 
+add_library(gen_mapping_lib STATIC src/gen_mapping/GenMapping.cpp)
+target_include_directories(gen_mapping_lib PUBLIC ${CMAKE_SOURCE_DIR}/include)
+target_compile_options(gen_mapping_lib PRIVATE -Wall -Wextra -Wpedantic)
+
 # ── Main executable ───────────────────────────────────────────────────────────
 add_executable(pi_poetry src/main.cpp)
 target_link_libraries(pi_poetry PRIVATE pipeline_lib config_validator_lib result_analyzer_lib tomlplusplus::tomlplusplus)
@@ -109,6 +113,11 @@ add_executable(analyze_results src/analyze_results.cpp)
 target_link_libraries(analyze_results PRIVATE result_analyzer_lib)
 target_compile_options(analyze_results PRIVATE -Wall -Wextra -Wpedantic)
 
+# ── Gen-mapping utility ───────────────────────────────────────────────────────
+add_executable(gen_mapping src/gen_mapping.cpp)
+target_link_libraries(gen_mapping PRIVATE gen_mapping_lib)
+target_compile_options(gen_mapping PRIVATE -Wall -Wextra -Wpedantic)
+
 # ── Tests ─────────────────────────────────────────────────────────────────────
 enable_testing()
 include(GoogleTest)
@@ -129,12 +138,14 @@ add_executable(pi_poetry_tests
     tests/test_api_digit_source.cpp
     tests/test_sentinel.cpp
     tests/test_mapping_file_mapper.cpp
+    tests/test_gen_mapping.cpp
 )
 target_link_libraries(pi_poetry_tests PRIVATE
     digit_source_lib digit_mapper_lib word_finder_lib phrase_scanner_lib
     pipeline_lib
     config_validator_lib
     result_analyzer_lib
+    gen_mapping_lib
     GTest::gtest_main
 )
 target_compile_definitions(pi_poetry_tests PRIVATE
