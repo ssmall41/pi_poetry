@@ -90,15 +90,6 @@ TEST(ConfigValidator, InvalidDigitMapperType) {
     EXPECT_TRUE(any_error_contains(errors, "two-digit-block"));
 }
 
-TEST(ConfigValidator, InvalidDigitMapperAlphabet) {
-    auto cfg = make_valid_table();
-    cfg["digit_mapper"].as_table()->insert_or_assign("alphabet", "alpha-upper");
-    auto errors = validate_config(cfg);
-    ASSERT_EQ(errors.size(), 1u);
-    EXPECT_TRUE(any_error_contains(errors, "digit_mapper.alphabet"));
-    EXPECT_TRUE(any_error_contains(errors, "alpha-lower"));
-}
-
 TEST(ConfigValidator, InvalidWordFinderType) {
     auto cfg = make_valid_table();
     cfg["word_finder"].as_table()->insert_or_assign("type", "naive");
@@ -131,15 +122,6 @@ TEST(ConfigValidator, DigitSourceThreadsMultipleIsValid) {
     auto cfg = make_valid_table();
     cfg["digit_source"].as_table()->insert_or_assign("threads", 4);
     EXPECT_TRUE(validate_config(cfg).empty());
-}
-
-TEST(ConfigValidator, InvalidDigitMapperBase) {
-    auto cfg = make_valid_table();
-    cfg["digit_mapper"].as_table()->insert_or_assign("base", 16);
-    auto errors = validate_config(cfg);
-    ASSERT_EQ(errors.size(), 1u);
-    EXPECT_TRUE(any_error_contains(errors, "digit_mapper.base"));
-    EXPECT_TRUE(any_error_contains(errors, "10"));
 }
 
 TEST(ConfigValidator, InvalidDigitMapperThreads) {
@@ -245,14 +227,6 @@ TEST(ConfigValidator, MissingOverlapPolicyUsesDefault) {
     auto cfg = make_valid_table();
     cfg["word_finder"].as_table()->erase("overlap_policy");
     EXPECT_TRUE(validate_config(cfg).empty());
-}
-
-TEST(ConfigValidator, WrongTypeForIntegerField) {
-    auto cfg = make_valid_table();
-    cfg["digit_mapper"].as_table()->insert_or_assign("base", "ten");
-    auto errors = validate_config(cfg);
-    ASSERT_EQ(errors.size(), 1u);
-    EXPECT_TRUE(any_error_contains(errors, "digit_mapper.base"));
 }
 
 // ── digit_source.chunk_size ──────────────────────────────────────────────────

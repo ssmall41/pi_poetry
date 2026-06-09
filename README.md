@@ -89,9 +89,7 @@ The configuration file is a [TOML](https://toml.io/) document passed via `--conf
 
 | Field | Default | Valid Values | Description |
 |-------|---------|--------------|-------------|
-| `type` | `"two-digit-block"` | `"two-digit-block"`, `"mapping-file"` | Mapper implementation to use. `"two-digit-block"` uses the built-in encoder; `"mapping-file"` loads the encoding from a plain-text file specified by `mapping_file`. |
-| `alphabet` * | `"alpha-lower"` | `"alpha-lower"` | *(type = "two-digit-block" only)* Character set to map digit pairs into. |
-| `base` * | `10` | `10` | *(type = "two-digit-block" only)* Numeric base of the digit stream. |
+| `type` | `"two-digit-block"` | `"two-digit-block"`, `"mapping-file"` | Mapper implementation to use. `"two-digit-block"` uses the built-in encoder (hardcoded: base 10, alphabet a–z); `"mapping-file"` loads the encoding from a plain-text file specified by `mapping_file`. |
 | `mapping_file` | — | Any file path | *(type = "mapping-file" only)* Path to the mapping file (relative to the working directory). See below for the file format. |
 | `threads` | `1` | Positive integer | Number of worker threads that convert digit packages to letter packages. |
 | `write_letter_sequence` | `false` | `true`, `false` | When true, writes the mapped letter sequence to `letter_sequence.txt` in the run directory. |
@@ -214,6 +212,48 @@ The output file contains raw decimal digits, one per byte, with no punctuation a
 ```
 
 In VSCode, use **Terminal > Run Task > Run: pi_download** — it will prompt for the digit count before running.
+
+### gen_mapping
+
+Generates a custom mapping file for use with `digit_mapper.type = "mapping-file"`. It reads a dictionary file, computes the frequency of each letter across all words, and produces a mapping where high-frequency letters are assigned proportionally more digit combos than low-frequency ones — every letter appears at least once. The combo-to-letter assignments are randomly shuffled so that a letter's slots are spread evenly across the digit range rather than clustered together.
+
+**Compile:**
+
+```bash
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --parallel --target gen_mapping
+```
+
+**Usage:**
+
+```
+./build/gen_mapping <dict_file> <digits> <output_path> [--seed N]
+```
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `dict_file` | Yes | Path to the dictionary file to compute letter frequencies from. Only alphabetic characters are counted; digits, spaces, and punctuation are ignored. Case is folded to lowercase. |
+| `digits` | Yes | Number of digits per character. Controls the total number of mapping slots: 10^digits (e.g. `2` → 100 slots, `3` → 1000 slots). Must be large enough to give every unique letter at least one slot; the program exits with an error otherwise. |
+| `output_path` | Yes | Where to write the mapping file. Existing files are overwritten. |
+| `--seed N` | No | Integer seed for the random shuffle. Using the same seed on the same input always produces identical output. Omit for a different mapping on each run. |
+
+**Examples:**
+
+```bash
+# Generate a frequency-proportional 2-digit mapping from the English dictionary
+./build/gen_mapping dictionaries/english.txt 2 config/mappings/english_freq.txt
+
+# Same mapping every time (reproducible)
+./build/gen_mapping dictionaries/english.txt 2 config/mappings/english_freq.txt --seed 42
+
+# Use the generated mapping in the pipeline
+# In config/default.toml:
+#   [digit_mapper]
+#   type = "mapping-file"
+#   mapping_file = "config/mappings/english_freq.txt"
+```
+
+The output file is in the [mapping file format](#mapping-file-format-type--mapping-file) described above and can be used directly with `digit_mapper.type = "mapping-file"`.
 
 ### analyze_results
 

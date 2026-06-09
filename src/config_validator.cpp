@@ -70,9 +70,6 @@ std::vector<std::string> validate_config(const toml::table& config) {
         if (mtype != "two-digit-block" && mtype != "mapping-file")
             errors.push_back("digit_mapper.type: must be \"two-digit-block\" or \"mapping-file\", got \""
                              + mtype + "\"");
-        if (mtype == "two-digit-block") {
-            check_reserved_str("digit_mapper", "alphabet", "alpha-lower");
-        }
         if (mtype == "mapping-file") {
             std::string mf = config["digit_mapper"]["mapping_file"].value_or(std::string(""));
             if (mf.empty())
@@ -102,11 +99,6 @@ std::vector<std::string> validate_config(const toml::table& config) {
                              std::to_string(*v));
         else if (!v && config["digit_source"]["chunk_size"])
             errors.push_back("digit_source.chunk_size: must be a positive integer");
-    }
-    {
-        std::string mtype = config["digit_mapper"]["type"].value_or(std::string("two-digit-block"));
-        if (mtype == "two-digit-block")
-            check_reserved_int("digit_mapper", "base", 10);
     }
     check_threads("digit_mapper");
     check_threads("word_finder");
