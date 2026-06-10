@@ -359,3 +359,350 @@ TEST(PhraseStatsAccumulator, MultiplePhrasesAccumulateCounts) {
     EXPECT_EQ(counts.at(2), 3u);
     EXPECT_EQ(counts.at(3), 1u);
 }
+
+TEST(PhraseStatsAccumulator, Merge_SumsLengthCounts) {
+    PhraseStatsAccumulator a;
+    a.add_phrase(0, {"a"});
+    a.add_phrase(10, {"cat", "dog"});
+
+    PhraseStatsAccumulator b;
+    b.add_phrase(20, {"be"});
+    b.add_phrase(30, {"fox", "ox"});
+    b.add_phrase(40, {"win", "an", "it"});
+
+    a.merge(b);
+
+    auto counts = a.length_counts();
+    EXPECT_EQ(counts.at(1), 2u);
+    EXPECT_EQ(counts.at(2), 2u);
+    EXPECT_EQ(counts.at(3), 1u);
+}
+
+TEST(PhraseStatsAccumulator, Merge_KeepsMinOffsetPerWord) {
+    PhraseStatsAccumulator a;
+    a.add_phrase(50, {"cat"});
+
+    PhraseStatsAccumulator b;
+    b.add_phrase(10, {"cat"});
+
+    a.merge(b);
+
+    auto top = a.top_n_longest_words(1);
+    ASSERT_EQ(top.size(), 1u);
+    EXPECT_EQ(top[0].word, "cat");
+    EXPECT_EQ(top[0].offset, 10u);
+}
+
+// ── find_phrase_chunk_boundaries ─────────────────────────────────────────────
+
+namespace {
+
+struct BoundaryFixture {
+    std::filesystem::path dir =
+        std::filesystem::temp_directory_path() / "pi_boundary_test";
+    std::filesystem::path json_path = dir / "results.json";
+
+    BoundaryFixture() {
+        std::filesystem::remove_all(dir);
+        std::filesystem::create_directories(dir);
+    }
+    ~BoundaryFixture() { std::filesystem::remove_all(dir); }
+
+    void write(const std::string& content) {
+        std::ofstream f(json_path, std::ios::binary);
+        f << content;
+    }
+
+    // Reads bytes [start, end) from json_path, wraps as {"phrases":[...]},
+    // and parses the resulting phrase objects.
+    std::vector<ParsedPhrase> parse_chunk(std::size_t start, std::size_t end) const {
+        std::ifstream f(json_path, std::ios::binary);
+        f.seekg(static_cast<std::streamoff>(start));
+        std::string buf(end - start, '\0');
+        f.read(buf.data(), static_cast<std::streamsize>(buf.size()));
+
+        std::string wrapped = "{\"phrases\":[" + buf + "]}";
+        std::vector<ParsedPhrase> phrases;
+        PhraseStreamHandler handler([&](ParsedPhrase&& p) { phrases.push_back(std::move(p)); });
+        nlohmann::json::sax_parse(wrapped, &handler);
+        return phrases;
+    }
+};
+
+}  // namespace
+
+TEST(FindChunkBoundaries, SinglePhraseReturnsOneChunk) {
+    BoundaryFixture fix;
+    fix.write(R"({"phrases":[{"start_offset":5,"words":["ab"]}]})");
+
+    auto chunks = find_phrase_chunk_boundaries(fix.json_path, 4);
+    ASSERT_EQ(chunks.size(), 1u);
+
+    auto phrases = fix.parse_chunk(chunks[0].first, chunks[0].second);
+    ASSERT_EQ(phrases.size(), 1u);
+    EXPECT_EQ(phrases[0].start_offset, 5u);
+    EXPECT_EQ(phrases[0].words, (std::vector<std::string>{"ab"}));
+}
+
+TEST(FindChunkBoundaries, SplitsEvenPhrasesAcrossThreads) {
+    BoundaryFixture fix;
+    fix.write(R"({"phrases":[)"
+              R"({"start_offset":10,"words":["aaa"]},)"
+              R"({"start_offset":20,"words":["bbb"]},)"
+              R"({"start_offset":30,"words":["ccc"]},)"
+              R"({"start_offset":40,"words":["ddd"]},)"
+              R"({"start_offset":50,"words":["eee"]},)"
+              R"({"start_offset":60,"words":["fff"]})"
+              R"(]})");
+
+    auto chunks = find_phrase_chunk_boundaries(fix.json_path, 2);
+    ASSERT_EQ(chunks.size(), 2u);
+
+    auto chunk0 = fix.parse_chunk(chunks[0].first, chunks[0].second);
+    auto chunk1 = fix.parse_chunk(chunks[1].first, chunks[1].second);
+    EXPECT_EQ(chunk0.size(), 3u);
+    EXPECT_EQ(chunk1.size(), 3u);
+}
+
+TEST(FindChunkBoundaries, FewerPhrasesThanThreadsCapsEffectiveThreads) {
+    BoundaryFixture fix;
+    fix.write(R"({"phrases":[)"
+              R"({"start_offset":1,"words":["a"]},)"
+              R"({"start_offset":2,"words":["b"]},)"
+              R"({"start_offset":3,"words":["c"]})"
+              R"(]})");
+
+    auto chunks = find_phrase_chunk_boundaries(fix.json_path, 8);
+    ASSERT_EQ(chunks.size(), 3u);
+
+    std::size_t total = 0;
+    for (const auto& [start, end] : chunks)
+        total += fix.parse_chunk(start, end).size();
+    EXPECT_EQ(total, 3u);
+}
+
+TEST(FindChunkBoundaries, EmptyPhrasesArraySignalsFallback) {
+    BoundaryFixture fix;
+    fix.write(R"({"phrases":[]})");
+    EXPECT_TRUE(find_phrase_chunk_boundaries(fix.json_path, 4).empty());
+}
+
+TEST(FindChunkBoundaries, MissingPhrasesKeySignalsFallback) {
+    BoundaryFixture fix;
+    fix.write(R"({"other":[]})");
+    EXPECT_TRUE(find_phrase_chunk_boundaries(fix.json_path, 4).empty());
+}
+
+TEST(FindChunkBoundaries, HandlesNestedArraysInObjects) {
+    BoundaryFixture fix;
+    fix.write(R"({"phrases":[)"
+              R"({"gap_sizes":[1,2],"start_offset":5,"words":["a","bb","ccc"]},)"
+              R"({"gap_sizes":[],"start_offset":100,"words":["xy"]})"
+              R"(]})");
+
+    auto chunks = find_phrase_chunk_boundaries(fix.json_path, 2);
+    ASSERT_EQ(chunks.size(), 2u);
+
+    auto chunk0 = fix.parse_chunk(chunks[0].first, chunks[0].second);
+    auto chunk1 = fix.parse_chunk(chunks[1].first, chunks[1].second);
+    ASSERT_EQ(chunk0.size(), 1u);
+    ASSERT_EQ(chunk1.size(), 1u);
+    EXPECT_EQ(chunk0[0].words, (std::vector<std::string>{"a", "bb", "ccc"}));
+    EXPECT_EQ(chunk1[0].words, (std::vector<std::string>{"xy"}));
+}
+
+// ── PhraseChunkStreamBuf ──────────────────────────────────────────────────────
+
+TEST(PhraseChunkStreamBuf, WrapsRangeWithPhrasesEnvelope) {
+    BoundaryFixture fix;
+    fix.write(R"({"phrases":[)"
+              R"({"start_offset":10,"words":["aaa"]})"
+              R"(]})");
+
+    auto chunks = find_phrase_chunk_boundaries(fix.json_path, 1);
+    ASSERT_EQ(chunks.size(), 1u);
+    auto [start, end] = chunks[0];
+
+    std::ifstream raw_f(fix.json_path, std::ios::binary);
+    raw_f.seekg(static_cast<std::streamoff>(start));
+    std::string raw(end - start, '\0');
+    raw_f.read(raw.data(), static_cast<std::streamsize>(raw.size()));
+
+    PhraseChunkStreamBuf buf(fix.json_path, start, end);
+    std::istream in(&buf);
+    std::ostringstream oss;
+    oss << in.rdbuf();
+
+    EXPECT_EQ(oss.str(), "{\"phrases\":[" + raw + "]}");
+}
+
+TEST(PhraseChunkStreamBuf, FeedsSaxParserCorrectly) {
+    BoundaryFixture fix;
+    fix.write(R"({"phrases":[)"
+              R"({"start_offset":10,"words":["aaa"]},)"
+              R"({"start_offset":20,"words":["bbb"]},)"
+              R"({"start_offset":30,"words":["ccc"]},)"
+              R"({"start_offset":40,"words":["ddd"]},)"
+              R"({"start_offset":50,"words":["eee"]},)"
+              R"({"start_offset":60,"words":["fff"]})"
+              R"(]})");
+
+    auto chunks = find_phrase_chunk_boundaries(fix.json_path, 2);
+    ASSERT_EQ(chunks.size(), 2u);
+
+    PhraseChunkStreamBuf buf(fix.json_path, chunks[1].first, chunks[1].second);
+    std::istream in(&buf);
+
+    std::vector<ParsedPhrase> phrases;
+    PhraseStreamHandler handler([&](ParsedPhrase&& p) { phrases.push_back(std::move(p)); });
+    EXPECT_TRUE(nlohmann::json::sax_parse(in, &handler));
+
+    ASSERT_EQ(phrases.size(), 3u);
+    EXPECT_EQ(phrases[0].start_offset, 40u);
+    EXPECT_EQ(phrases[0].words, (std::vector<std::string>{"ddd"}));
+    EXPECT_EQ(phrases[1].start_offset, 50u);
+    EXPECT_EQ(phrases[2].start_offset, 60u);
+    EXPECT_EQ(phrases[2].words, (std::vector<std::string>{"fff"}));
+}
+
+TEST(PhraseChunkStreamBuf, HandlesRangeLargerThanInternalBuffer) {
+    BoundaryFixture fix;
+
+    constexpr int kCount = 5000;
+    std::ostringstream json;
+    json << R"({"phrases":[)";
+    for (int i = 0; i < kCount; ++i) {
+        if (i > 0) json << ',';
+        json << R"({"start_offset":)" << i << R"(,"words":["word)" << i << R"("]})";
+    }
+    json << "]}";
+    fix.write(json.str());
+
+    auto chunks = find_phrase_chunk_boundaries(fix.json_path, 1);
+    ASSERT_EQ(chunks.size(), 1u);
+    auto [start, end] = chunks[0];
+    ASSERT_GT(end - start, 65536u);
+
+    std::ifstream raw_f(fix.json_path, std::ios::binary);
+    raw_f.seekg(static_cast<std::streamoff>(start));
+    std::string raw(end - start, '\0');
+    raw_f.read(raw.data(), static_cast<std::streamsize>(raw.size()));
+
+    {
+        PhraseChunkStreamBuf buf(fix.json_path, start, end);
+        std::istream in(&buf);
+        std::ostringstream oss;
+        oss << in.rdbuf();
+        EXPECT_EQ(oss.str(), "{\"phrases\":[" + raw + "]}");
+    }
+
+    {
+        PhraseChunkStreamBuf buf(fix.json_path, start, end);
+        std::istream in(&buf);
+        std::vector<ParsedPhrase> phrases;
+        PhraseStreamHandler handler([&](ParsedPhrase&& p) { phrases.push_back(std::move(p)); });
+        EXPECT_TRUE(nlohmann::json::sax_parse(in, &handler));
+
+        ASSERT_EQ(phrases.size(), static_cast<std::size_t>(kCount));
+        EXPECT_EQ(phrases.front().start_offset, 0u);
+        EXPECT_EQ(phrases.back().start_offset, static_cast<std::size_t>(kCount - 1));
+    }
+}
+
+// ── analyze() parallel orchestration ─────────────────────────────────────────
+
+namespace {
+
+std::string read_file(const std::filesystem::path& p) {
+    std::ifstream f(p, std::ios::binary);
+    std::ostringstream oss;
+    oss << f.rdbuf();
+    return oss.str();
+}
+
+std::vector<std::string> phrase_length_filenames(const std::filesystem::path& dir) {
+    std::vector<std::string> names;
+    for (const auto& entry : std::filesystem::directory_iterator(dir)) {
+        auto name = entry.path().filename().string();
+        if (name.rfind("phrases_length_", 0) == 0) names.push_back(name);
+    }
+    std::sort(names.begin(), names.end());
+    return names;
+}
+
+// Compares analyze(dir, 1) against analyze(dir, n_threads) on the same input,
+// asserting statistics.txt and all phrases_length_*.txt files are identical.
+void expect_parallel_matches_serial(const std::string& json, std::size_t n_threads) {
+    AnalyzeFixture serial_fix;
+    AnalyzeFixture parallel_fix;
+    serial_fix.write_results_json(json);
+    parallel_fix.write_results_json(json);
+
+    analyze(serial_fix.dir, 1);
+    analyze(parallel_fix.dir, n_threads);
+
+    EXPECT_EQ(read_file(serial_fix.dir / "statistics.txt"),
+              read_file(parallel_fix.dir / "statistics.txt"));
+
+    auto serial_files = phrase_length_filenames(serial_fix.dir);
+    auto parallel_files = phrase_length_filenames(parallel_fix.dir);
+    ASSERT_EQ(serial_files, parallel_files);
+    for (const auto& name : serial_files) {
+        EXPECT_EQ(read_file(serial_fix.dir / name), read_file(parallel_fix.dir / name)) << name;
+    }
+}
+
+const char* kSixPhraseJson = R"({"phrases":[)"
+    R"({"start_offset":10,"words":["aaa"]},)"
+    R"({"start_offset":20,"words":["bbb"]},)"
+    R"({"start_offset":30,"words":["ccc"]},)"
+    R"({"start_offset":40,"words":["ddd"]},)"
+    R"({"start_offset":50,"words":["eee"]},)"
+    R"({"start_offset":60,"words":["fff"]})"
+    R"(]})";
+
+}  // namespace
+
+TEST(AnalyzeParallel, MatchesSerial_EvenSplit) {
+    expect_parallel_matches_serial(kSixPhraseJson, 2);
+}
+
+TEST(AnalyzeParallel, MatchesSerial_SinglePhrase) {
+    expect_parallel_matches_serial(R"({"phrases":[{"start_offset":5,"words":["ab"]}]})", 4);
+}
+
+TEST(AnalyzeParallel, FallsBackForEmptyPhrases) {
+    AnalyzeFixture fix;
+    fix.write_results_json(R"({"phrases":[]})");
+
+    analyze(fix.dir, 4);
+
+    std::ifstream stats(fix.dir / "statistics.txt");
+    EXPECT_TRUE(stats.good());
+    EXPECT_TRUE(phrase_length_filenames(fix.dir).empty());
+    EXPECT_FALSE(std::filesystem::exists(fix.dir / ".analyze_tmp"));
+}
+
+TEST(AnalyzeParallel, HandlesFewerPhrasesThanThreads) {
+    expect_parallel_matches_serial(R"({"phrases":[)"
+                                    R"({"start_offset":1,"words":["a"]},)"
+                                    R"({"start_offset":2,"words":["b"]},)"
+                                    R"({"start_offset":3,"words":["c"]})"
+                                    R"(]})",
+                                    8);
+}
+
+TEST(AnalyzeParallel, MalformedJsonThrows) {
+    AnalyzeFixture fix;
+    fix.write_results_json("not json at all");
+    EXPECT_THROW(analyze(fix.dir, 4), nlohmann::json::exception);
+}
+
+TEST(AnalyzeParallel, CleansUpTempDir) {
+    AnalyzeFixture fix;
+    fix.write_results_json(kSixPhraseJson);
+
+    analyze(fix.dir, 2);
+
+    EXPECT_FALSE(std::filesystem::exists(fix.dir / ".analyze_tmp"));
+}

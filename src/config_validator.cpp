@@ -21,22 +21,6 @@ std::vector<std::string> validate_config(const toml::table& config) {
                              "\", got \"" + s->get() + "\"");
     };
 
-    auto check_reserved_int = [&](std::string_view section, std::string_view key,
-                                  int64_t expected) {
-        auto node = config[section][key];
-        if (!node) return;
-        auto v = node.value<int64_t>();
-        if (!v) {
-            errors.push_back(std::string(section) + "." + std::string(key) +
-                             ": must be " + std::to_string(expected));
-            return;
-        }
-        if (*v != expected)
-            errors.push_back(std::string(section) + "." + std::string(key) +
-                             ": must be " + std::to_string(expected) +
-                             ", got " + std::to_string(*v));
-    };
-
     {
         std::string mode = config["pipeline"]["mode"].value_or(std::string("serial"));
         if (mode != "serial" && mode != "parallel")
@@ -103,6 +87,7 @@ std::vector<std::string> validate_config(const toml::table& config) {
     check_threads("digit_mapper");
     check_threads("word_finder");
     check_threads("phrase_scanner");
+    check_threads("analysis");
 
     {
         std::string policy = config["word_finder"]["overlap_policy"]

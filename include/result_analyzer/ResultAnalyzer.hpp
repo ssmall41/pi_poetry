@@ -5,6 +5,7 @@
 #include <map>
 #include <nlohmann/json.hpp>
 #include <ostream>
+#include <streambuf>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -16,7 +17,41 @@ struct WordOccurrence {
     std::size_t offset{};
 };
 
-void analyze(const std::filesystem::path& output_dir);
+void analyze(const std::filesystem::path& output_dir, std::size_t n_threads = 1);
+
+// Scans `json_path` for a top-level "phrases" array and partitions its
+// objects into up to n_threads contiguous, non-overlapping groups, roughly
+// balanced by byte size. Each returned [start, end) pair is a byte range
+// beginning at the '{' of the group's first object and ending just past the
+// '}' of its last object (i.e. excluding the separating ',' between groups),
+// suitable for wrapping as `{"phrases":[` + bytes + `]}`. Returns one entry
+// per chunk; effective_threads = result.size() = min(n_threads, number of
+// phrase objects). Returns an empty vector if the "phrases" array is missing
+// or empty.
+std::vector<std::pair<std::size_t, std::size_t>> find_phrase_chunk_boundaries(
+    const std::filesystem::path& json_path, std::size_t n_threads);
+
+// A std::streambuf that presents the byte range [start, end) of `json_path`
+// as a self-contained JSON document `{"phrases":[` + bytes + `]}`, reading
+// the underlying file in bounded (~64KB) blocks rather than copying the
+// whole range into memory. Intended to be wrapped in a std::istream and fed
+// to PhraseStreamHandler via nlohmann::json::sax_parse.
+class PhraseChunkStreamBuf : public std::streambuf {
+public:
+    PhraseChunkStreamBuf(const std::filesystem::path& json_path, std::size_t start,
+                          std::size_t end);
+
+protected:
+    int_type underflow() override;
+
+private:
+    enum class Phase { Prefix, Body, Suffix, Done };
+
+    std::ifstream file_;
+    std::size_t remaining_;
+    Phase phase_ = Phase::Prefix;
+    std::vector<char> buffer_;
+};
 
 // Accumulates phrase statistics in a single pass with memory bounded by the
 // number of distinct phrase lengths and the vocabulary size, regardless of
@@ -24,6 +59,11 @@ void analyze(const std::filesystem::path& output_dir);
 class PhraseStatsAccumulator {
 public:
     void add_phrase(std::size_t start_offset, const std::vector<std::string>& words);
+
+    // Combines another accumulator's counts into this one: length counts are
+    // summed, and per-word minimum offsets are merged by taking the smaller
+    // of the two offsets for each word.
+    void merge(const PhraseStatsAccumulator& other);
 
     const std::map<std::size_t, std::size_t>& length_counts() const;
 
