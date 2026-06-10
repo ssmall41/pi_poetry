@@ -141,6 +141,7 @@ base=10
 | Field | Default | Valid Values | Description |
 |-------|---------|--------------|-------------|
 | `run_after_pipeline` | `false` | `true`, `false` | When true, automatically runs the result analyzer after the pipeline finishes. Writes per-length phrase files and `statistics.txt` into the run directory. When enabled, the timing output includes a separate `Analysis time` line in addition to `Pipeline time` and `Total time`. |
+| `threads` | `1` | Positive integer | Number of worker threads used by the result analyzer. The `phrases` array in `results.json` is split into roughly equal byte-range chunks (one per thread) that are parsed and written in parallel, then merged into the final per-length phrase files and `statistics.txt`. |
 
 \* Only one value is currently supported; the field is validated on startup.
 
@@ -272,12 +273,13 @@ cmake --build build --parallel --target analyze_results
 **Usage:**
 
 ```
-./build/analyze_results <output_dir>
+./build/analyze_results <output_dir> [threads]
 ```
 
 | Argument | Required | Description |
 |----------|----------|-------------|
 | `output_dir` | Yes | Path to a run directory that contains `results.json` (e.g. `outputs/run-20260508_143022`). Output files are written into the same directory. |
+| `threads` | No | Number of worker threads to use (default: 1). The `phrases` array is split into roughly equal byte-range chunks, one per thread, processed in parallel and then merged. |
 
 **Example:**
 
@@ -287,6 +289,9 @@ cmake --build build --parallel --target analyze_results
 
 # Analyze the most recent run
 ./build/analyze_results outputs/run-20260508_143022
+
+# Analyze using 8 threads
+./build/analyze_results outputs/run-20260508_143022 8
 ```
 
 ## Technical Design
