@@ -8,13 +8,16 @@ dry_run = false
 
 [digit_source]
 type = "file"
-path = "data/pi_1p5e9.txt"
+path = "data/pi_max.txt"
 threads = 1
 chunk_size = 32768
 queue_size = 16
 
 [digit_mapper]
-type = "two-digit-block"
+type = "mapping-file"
+mapping_file = "config/mappings/random_seed_5.txt"
+alphabet = "alpha-lower"
+base = 10
 threads = 1
 write_letter_sequence = false
 queue_size = 16
@@ -24,14 +27,14 @@ type = "aho-corasick-cpu"
 dictionary = "dictionaries/google-10000-english-trimmed.txt"
 overlap_policy = "all-combos"
 min_word_length = 1
-threads = 6
+threads = 4
 queue_size = 10000
 
 [phrase_scanner]
 type = "human-review"
 min_phrase_length = 3
-threads = 1
-queue_size = 1000
+threads = 4
+queue_size = 10000
 
 [analysis]
 run_after_pipeline = true
