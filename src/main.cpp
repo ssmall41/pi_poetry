@@ -53,6 +53,7 @@ int main(int argc, char* argv[]) {
         std::string out_dir = config["output"]["dir"].value_or(std::string("outputs"));
         bool write_letter_sequence = config["digit_mapper"]["write_letter_sequence"].value_or(false);
         bool run_analysis = config["analysis"]["run_after_pipeline"].value_or(false);
+        std::size_t analysis_threads = config["analysis"]["threads"].value_or(std::size_t{1});
         bool dry_run      = config["pipeline"]["dry_run"].value_or(false);
 
         auto now = std::chrono::system_clock::now();
@@ -141,7 +142,7 @@ int main(int argc, char* argv[]) {
         auto pipeline_end = std::chrono::steady_clock::now();
 
         if (run_analysis && !dry_run) {
-            result_analyzer::analyze(run_dir);
+            result_analyzer::analyze(run_dir, analysis_threads);
             auto total_end  = std::chrono::steady_clock::now();
             auto pipeline_s = std::chrono::duration<double>(pipeline_end - start).count();
             auto analysis_s = std::chrono::duration<double>(total_end - pipeline_end).count();

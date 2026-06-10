@@ -38,3 +38,4 @@ queue_size = 10000
 
 [analysis]
 run_after_pipeline = true
+threads = 8

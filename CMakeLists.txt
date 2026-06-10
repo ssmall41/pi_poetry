@@ -77,7 +77,7 @@ target_compile_options(pipeline_lib PRIVATE -Wall -Wextra -Wpedantic)
 
 add_library(result_analyzer_lib STATIC src/result_analyzer/ResultAnalyzer.cpp)
 target_include_directories(result_analyzer_lib PUBLIC ${CMAKE_SOURCE_DIR}/include)
-target_link_libraries(result_analyzer_lib PUBLIC nlohmann_json::nlohmann_json)
+target_link_libraries(result_analyzer_lib PUBLIC nlohmann_json::nlohmann_json Threads::Threads)
 target_compile_options(result_analyzer_lib PRIVATE -Wall -Wextra -Wpedantic)
 
 add_library(config_validator_lib STATIC src/config_validator.cpp)

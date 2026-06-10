@@ -103,6 +103,7 @@ std::vector<std::string> validate_config(const toml::table& config) {
     check_threads("digit_mapper");
     check_threads("word_finder");
     check_threads("phrase_scanner");
+    check_threads("analysis");
 
     {
         std::string policy = config["word_finder"]["overlap_policy"]
