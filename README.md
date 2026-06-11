@@ -6,9 +6,24 @@ Pi Poetry searches for natural-language words and phrases hidden in the decimal 
 
 **Requirements:** GCC 13+, CMake 3.28+, Python 3 (used once at configure time to compile cpp-httplib as a library). Dependencies (nlohmann/json, toml++, cpp-httplib, Google Test) are downloaded automatically via CMake FetchContent.
 
+**Debug build** (development, includes the test binary):
+
 ```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 cmake --build build --parallel 4
+```
+
+**Release build** (optimized `-O3`, for real runs over large digit files):
+
+```bash
+cmake -S . -B build_release -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS=-O3
+cmake --build build_release --parallel 4
+```
+
+The optimized programs are then at `build_release/pi_poetry`, `build_release/pi_download`, etc. The default build also compiles the test binary; to build **only** the production programs (the bulk of the release build time is the test binary, so this is much faster), restrict the targets:
+
+```bash
+cmake --build build_release --parallel 4 --target pi_poetry pi_download gen_mapping analyze_results
 ```
 
 **Build performance / memory.** The build is dominated by heavyweight header-only
