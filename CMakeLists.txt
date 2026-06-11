@@ -6,6 +6,20 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+# ── Compile cache ─────────────────────────────────────────────────────────────
+# If ccache is installed, route all compiles through it. Unchanged translation
+# units are then served from cache on rebuilds/branch-switches/CI with no
+# recompile (and no memory cost). Header-only deps (json/toml++/httplib) are
+# the same headers regardless of source, so caching the resulting objects is
+# the main lever for them, alongside the precompiled headers configured below.
+# For PCH compatibility, set CCACHE_SLOPPINESS=pch_defines,time_macros in your
+# environment (see README).
+find_program(CCACHE_PROGRAM ccache)
+if(CCACHE_PROGRAM)
+    message(STATUS "Using ccache: ${CCACHE_PROGRAM}")
+    set(CMAKE_CXX_COMPILER_LAUNCHER "${CCACHE_PROGRAM}")
+endif()
+
 # ── Dependencies ─────────────────────────────────────────────────────────────
 find_package(OpenSSL REQUIRED)
 include(FetchContent)
@@ -27,12 +41,32 @@ FetchContent_Declare(
     URL https://github.com/yhirose/cpp-httplib/archive/refs/tags/v0.43.3.tar.gz
 )
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+# We link only GTest::gtest_main, never gmock. Skip building gmock/gmock_main
+# (template-heavy TUs) and the gtest install rules — pure clean-build time saved.
+set(BUILD_GMOCK OFF CACHE BOOL "" FORCE)
+set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
 # Disable httplib's non-blocking getaddrinfo: it spawns a std::thread per DNS
 # lookup, which creates one thread per HTTP request when keep-alive is not yet
 # established. Blocking getaddrinfo is fine here — DNS is OS-cached after the
 # first lookup per thread.
 set(HTTPLIB_USE_NON_BLOCKING_GETADDRINFO OFF CACHE BOOL "" FORCE)
+# Compile cpp-httplib once into a static library (a bundled Python script splits
+# its single header into a .h + .cc) instead of inlining its ~10k-line
+# implementation into every TU that includes <httplib.h>. Cuts both clean-build
+# time and per-TU compile memory for the digit-source/download targets.
+set(HTTPLIB_COMPILE ON CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(nlohmann_json tomlplusplus googletest cpp-httplib)
+
+# Strip debug info from third-party dependency objects: we never step into
+# httplib/gtest sources, and at -O0 -g their big single TUs (httplib.cc ~25s,
+# gtest-all ~12s) are among the longest serial poles in a Debug clean build.
+# -g0 trims ~10s off that critical path; Release/Perf already build them
+# without -g, so this only affects Debug. (Our own targets keep full -g.)
+foreach(_dep_target httplib gtest gtest_main)
+    if(TARGET ${_dep_target})
+        target_compile_options(${_dep_target} PRIVATE -g0)
+    endif()
+endforeach()
 
 find_package(Threads REQUIRED)
 
@@ -153,6 +187,20 @@ target_compile_definitions(pi_poetry_tests PRIVATE
     DICT_PATH="${CMAKE_SOURCE_DIR}/dictionaries/english.txt"
 )
 target_compile_options(pi_poetry_tests PRIVATE -Wall -Wextra -Wpedantic)
+
+# The test binary is 16 TUs, all including <gtest/gtest.h> and most including
+# the ~25k-line <nlohmann/json.hpp>. Precompile that shared front-matter once
+# for the target instead of re-parsing it per TU. The few light test TUs that
+# don't use json pay only a cheap PCH load, not a full parse. This is the
+# single biggest parse-time win in the build (multi-TU reuse is what makes PCH
+# pay off, which is why the single-TU libraries above don't use it).
+target_precompile_headers(pi_poetry_tests PRIVATE
+    <gtest/gtest.h>
+    <nlohmann/json.hpp>
+    <string>
+    <vector>
+    <map>
+    <filesystem>)
 
 gtest_discover_tests(pi_poetry_tests
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
