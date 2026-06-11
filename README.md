@@ -4,12 +4,55 @@ Pi Poetry searches for natural-language words and phrases hidden in the decimal 
 
 ## Building
 
-**Requirements:** GCC 13+, CMake 3.28+. Dependencies (nlohmann/json, toml++, Google Test) are downloaded automatically via CMake FetchContent.
+**Requirements:** GCC 13+, CMake 3.28+, Python 3 (used once at configure time to compile cpp-httplib as a library). Dependencies (nlohmann/json, toml++, cpp-httplib, Google Test) are downloaded automatically via CMake FetchContent.
+
+**Debug build** (development, includes the test binary):
 
 ```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
-cmake --build build --parallel
+cmake --build build --parallel 4
 ```
+
+**Release build** (optimized `-O3`, for real runs over large digit files):
+
+```bash
+cmake -S . -B build_release -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS=-O3
+cmake --build build_release --parallel 4
+```
+
+The optimized programs are then at `build_release/pi_poetry`, `build_release/pi_download`, etc. The default build also compiles the test binary; to build **only** the production programs (the bulk of the release build time is the test binary, so this is much faster), restrict the targets:
+
+```bash
+cmake --build build_release --parallel 4 --target pi_poetry pi_download gen_mapping analyze_results
+```
+
+**Build performance / memory.** The build is dominated by heavyweight header-only
+dependencies (`nlohmann/json`, `cpp-httplib`), so a few measures keep it fast and
+keep the machine usable while compiling:
+
+- **`--parallel 4`** (not bare `--parallel`): each heavy `-O3` translation unit can
+  need ~0.3–1.5 GiB, so eight at once will thrash a memory-constrained machine
+  into swap. Cap to ~4 (use `--parallel 3` if you still swap).
+- **Install `ccache`** (`sudo apt install ccache`) — CMake auto-detects it and routes
+  all compiles through it, so unchanged translation units (including the one-time
+  Google Test compile) are served from cache on rebuilds and branch switches with no
+  recompile and no memory cost. For precompiled-header compatibility, add
+  `export CCACHE_SLOPPINESS=pch_defines,time_macros` to your shell rc.
+- The test binary uses a **precompiled header** for `gtest`/`json`, and `cpp-httplib`
+  is compiled **once** into a static library instead of inlined per TU — both happen
+  automatically, no action needed.
+- **gmock is not built** (only `gtest_main` is linked) and the third-party deps
+  (`cpp-httplib`, Google Test) are compiled with `-g0` — we never debug into them.
+  These cut total compile work and lower peak memory (~728 → ~620 MiB for a Debug
+  clean build).
+
+**A note on clean-build wall-clock.** With the Unix Makefiles generator the clean
+build is *critical-path bound*, not throughput bound: after an initial 8-wide burst
+it tails off to 1–3 active compiles (long single TUs such as `httplib.cc`, the PCH,
+and the final single-threaded link), so it averages only ~3 of 8 cores and raising
+`--parallel` past ~4 does **not** help. The big lever for wall-clock would be the
+**Ninja generator** (`cmake -G Ninja …`), which schedules all cores and would
+roughly halve a clean build — adopt it if clean-build time becomes a priority.
 
 ## Running
 
@@ -178,7 +221,7 @@ Downloads digits of pi from the [pi.delivery](https://pi.delivery) API and write
 
 ```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build --parallel --target pi_download
+cmake --build build --parallel 4 --target pi_download
 ```
 
 **Usage:**
@@ -222,7 +265,7 @@ Generates a custom mapping file for use with `digit_mapper.type = "mapping-file"
 
 ```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build --parallel --target gen_mapping
+cmake --build build --parallel 4 --target gen_mapping
 ```
 
 **Usage:**
@@ -267,7 +310,7 @@ Analyzes a `results.json` file produced by the main pipeline. Can be run automat
 
 ```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build --parallel --target analyze_results
+cmake --build build --parallel 4 --target analyze_results
 ```
 
 **Usage:**

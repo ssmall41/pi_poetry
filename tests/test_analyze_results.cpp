@@ -1,5 +1,5 @@
 #include <gtest/gtest.h>
-#include "result_analyzer/ResultAnalyzer.hpp"
+#include "result_analyzer/ResultAnalyzerInternal.hpp"  // ResultAnalyzer.hpp + PhraseStreamHandler
 #include <nlohmann/json.hpp>
 #include <filesystem>
 #include <fstream>

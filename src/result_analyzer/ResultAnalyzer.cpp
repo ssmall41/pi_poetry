@@ -1,5 +1,4 @@
-#include "result_analyzer/ResultAnalyzer.hpp"
-#include <nlohmann/json.hpp>
+#include "result_analyzer/ResultAnalyzerInternal.hpp"  // ResultAnalyzer.hpp + json + PhraseStreamHandler
 #include <algorithm>
 #include <exception>
 #include <fstream>
