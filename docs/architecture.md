@@ -1,13 +1,13 @@
 # Pi Poetry — Pipeline Architecture
 
-Pi Poetry searches the decimal expansion of π for sequences of English words encoded in consecutive digit pairs. A four-stage pipeline converts raw digits into human-readable phrases.
+Pi Poetry searches a sequence of digits, maps them to letters, and searaches for sequences of English words. A four-stage pipeline converts raw digits into human-readable phrases.
 
 ---
 
 ## Pipeline Diagram
 
 ```
-  pi digits (file or API)
+  digits (file or API)
         │
         │ read_at()
         ▼
@@ -82,8 +82,15 @@ Pi Poetry searches the decimal expansion of π for sequences of English words en
 
 **Key files:**
 - [include/digit_mapper/DigitMapper.hpp](../include/digit_mapper/DigitMapper.hpp) — abstract interface
-- [include/digit_mapper/TwoDigitBlockMapper.hpp](../include/digit_mapper/TwoDigitBlockMapper.hpp)
+- [include/digit_mapper/TwoDigitBlockMapper.hpp](../include/digit_mapper/TwoDigitBlockMapper.hpp) — built-in encoder
 - [src/digit_mapper/TwoDigitBlockMapper.cpp](../src/digit_mapper/TwoDigitBlockMapper.cpp)
+- [include/digit_mapper/MappingFileMapper.hpp](../include/digit_mapper/MappingFileMapper.hpp) — loads an arbitrary digits→char table from a file
+- [src/digit_mapper/MappingFileMapper.cpp](../src/digit_mapper/MappingFileMapper.cpp)
+
+Two implementations satisfy the `DigitMapper` interface. The `two-digit-block` encoder described
+below is hardcoded (base 10, alphabet `a`–`z`). The `mapping-file` mapper instead loads its
+digits→char table from a file, so `digits_per_char` and `alphabet_size` are determined by that
+file rather than fixed. The encoding algorithm shown below is specific to `TwoDigitBlockMapper`.
 
 **Inputs:** A chunk of `uint8_t` digit values (0–9) from the digit source.
 
@@ -147,22 +154,26 @@ struct WordMatch {
 
 | Policy | Description |
 |---|---|
-| `EarliestThenLongest` | Sort raw matches by (start ascending, length descending) and greedily select non-overlapping matches. Produces one deterministic sequence per chunk. |
-| `AllCombos` | Enumerate every possible non-overlapping chain via DFS, calling a callback for each chain. Used to maximise phrase variety. |
+| `EarliestThenLongest` | Sort raw matches by (start ascending, length descending) and greedily select non-overlapping matches, then split that selection into maximal *consecutive* (zero-gap) runs. Each run that contains at least `min_phrase_length` consecutive words is emitted as its own chain — so a chunk yields 0–N chains, not one. |
+| `AllCombos` | Enumerate every possible non-overlapping chain via DFS, calling a callback for each chain. Chains without a run of `min_phrase_length` consecutive words are dropped (`chain_has_qualifying_run`). Used to maximise phrase variety. |
 
 **Lookahead:** For chunk-boundary correctness, each chunk is extended by `max_word_length − 1` extra characters. Words whose start offset falls in the lookahead zone are discarded; only words whose start is in the real portion of the chunk are kept.
 
-**Key interface methods:**
+**Key interface methods:** `scan`, `load_dictionary`, and `set_overlap_policy` form the abstract
+`WordFinder` interface ([WordFinder.hpp](../include/word_finder/WordFinder.hpp)). The remaining
+methods below are specific to the `AhoCorasickCPU` implementation
+([AhoCorasickCPU.hpp](../include/word_finder/AhoCorasickCPU.hpp)) and are what the pipeline calls.
 
 | Method | Description |
 |---|---|
 | `load_dictionary(path)` | Load word list (one word per line); respects `min_word_length`. |
 | `build()` | Construct the automaton; must be called after loading the dictionary. |
 | `scan_chunk(chunk, len, offset, state, raw_out)` | Stateful incremental scan; `state` carries the automaton node between calls. |
-| `apply_etl_cb(raw, offset, on_chain)` | Apply `EarliestThenLongest`; calls `on_chain` 0–1 times (0 when no matches). |
-| `apply_all_combos_cb(raw, offset, on_chain)` | Enumerate all chains; calls `on_chain` 0–N times. |
+| `apply_etl_cb(raw, offset, on_chain)` | Apply `EarliestThenLongest`; calls `on_chain` 0–N times — once per consecutive word run that meets `min_phrase_length`. |
+| `apply_all_combos_cb(raw, offset, on_chain)` | Enumerate all chains; calls `on_chain` 0–N times, skipping chains without a qualifying run. |
 | `apply_policy_cb(raw, offset, on_chain)` | Dispatch to `apply_etl_cb` or `apply_all_combos_cb` based on the configured policy. |
 | `set_min_word_length(n)` | Filter out short words before building the automaton. |
+| `set_min_phrase_length(n)` | Minimum consecutive-word run length a chain must contain to be emitted. |
 
 ---
 
@@ -254,7 +265,7 @@ Every queue shares the same capacity, set by `queue_capacity` in `ParallelConfig
 
 **Connects:** Word finder workers → Phrase scanner workers
 
-**Purpose:** Carries a single resolved word chain (one result of the overlap policy) from the word finder to the phrase scanner. Under `EarliestThenLongest` each chunk produces exactly one `ComboPackage`; under `AllCombos` a chunk can produce many packages (one per enumerated chain), each with its own `intra_chunk_seq_id`.
+**Purpose:** Carries a single resolved word chain (one result of the overlap policy) from the word finder to the phrase scanner. A chunk produces one `ComboPackage` per emitted chain — under either policy this can be many packages (one per consecutive run under `EarliestThenLongest`, one per enumerated chain under `AllCombos`), each with its own `intra_chunk_seq_id`. A chunk with no qualifying chains still emits a single terminator package (empty `chain`, `final_package_in_chunk = true`) so the `ReorderBuffer` sees every chunk.
 
 **Capacity:** `queue_capacity` (default 16)
 
@@ -263,9 +274,11 @@ Every queue shares the same capacity, set by `queue_capacity` in `ParallelConfig
 | Field | Type | Description |
 |---|---|---|
 | `chunk_id` | `size_t` | Chunk index; matches `seq_id` of the source `LetterPackage`. |
-| `intra_chunk_seq_id` | `size_t` | 0-based index of this package within its chunk. Always 0 under `EarliestThenLongest`; increments per chain under `AllCombos`. |
+| `intra_chunk_seq_id` | `size_t` | 0-based index of this package within its chunk; increments per emitted chain. |
 | `final_package_in_chunk` | `bool` | `true` for the last package in a chunk, signalling the `ReorderBuffer` that all intra-chunk packages have been seen. |
 | `chain` | `vector<WordMatch>` | Ordered, non-overlapping word matches for this chain. |
+| `letter_chars` | `vector<char>` | Only populated on the final package when `write_letters` is enabled: the chunk's real (non-lookahead) mapped characters, carried through so the writer can emit `letter_sequence.txt` in order. |
+| `num_real_letter_chars` | `size_t` | Number of valid characters in `letter_chars`. |
 
 ---
 
@@ -285,6 +298,8 @@ Every queue shares the same capacity, set by `queue_capacity` in `ParallelConfig
 | `intra_chunk_seq_id` | `size_t` | Intra-chunk sequence index; mirrors the `ComboPackage` value. |
 | `final_package_in_chunk` | `bool` | `true` for the last package in a chunk; used by `ReorderBuffer` to drain in order. |
 | `json_strs` | `vector<string>` | Pre-serialized JSON objects, one per phrase (no comma or surrounding newline). Built by the scanner worker. |
+| `letter_chars` | `vector<char>` | Carried through from the `ComboPackage`: real mapped characters for the chunk (only on the final package when `write_letters` is enabled). |
+| `num_real_letter_chars` | `size_t` | Number of valid characters in `letter_chars`. |
 
 ---
 
@@ -318,10 +333,10 @@ Each worker loops: pop a `DigitPackage` from `digit_q`, apply `TwoDigitBlockMapp
 
 Each worker pops a `LetterPackage` from `letter_q`, runs the Aho-Corasick scan from a fresh automaton state (state is not carried across packages in parallel mode), discards matches that start in the lookahead zone, and applies the configured overlap policy:
 
-- **`EarliestThenLongest`:** emits one `ComboPackage` per chunk.
-- **`AllCombos`:** emits one `ComboPackage` per enumerated word chain, with the `final_package_in_chunk` flag set on the last one.
+- **`EarliestThenLongest`:** emits one `ComboPackage` per consecutive word run that meets `min_phrase_length`.
+- **`AllCombos`:** emits one `ComboPackage` per enumerated word chain.
 
-All resulting `ComboPackage` items are pushed to `combo_q`. The last active finder calls `combo_q.set_done()`.
+Either way the `final_package_in_chunk` flag is set on the last package of the chunk. A chunk with no qualifying chains still emits a single empty terminator package so the `ReorderBuffer` accounts for every chunk. When `write_letters` is enabled, the chunk's real mapped characters are attached to that final package (`letter_chars` / `num_real_letter_chars`). All resulting `ComboPackage` items are pushed to `combo_q`. The last active finder calls `combo_q.set_done()`.
 
 Word scanning is CPU-bound and typically the most expensive stage, so `finder_threads` is the most impactful knob for performance.
 
@@ -336,5 +351,7 @@ Each worker pops a `ComboPackage` from `combo_q`, calls `HumanReviewScanner::pro
 The writer thread pops `PhrasePackage` items from `phrase_q` and submits each one to a `ReorderBuffer`. The `ReorderBuffer` holds packages until all prior chunks (by `chunk_id` and `intra_chunk_seq_id`) have arrived, then drains them in order — ensuring that `results.json` is written in the same offset order as a serial run, regardless of which worker processed which chunk first.
 
 Because phrases arrive pre-serialized in `json_strs`, the writer only concatenates strings to the output stream; it performs no phrase formatting or JSON construction itself.
+
+When `write_letters` is enabled, the writer also assembles `letter_sequence.txt`: as each chunk's final package drains in order, its `letter_chars` are appended to the file, reconstructing the full mapped character stream in offset order (see [Pipeline.cpp](../src/pipeline/Pipeline.cpp), `flush_phrase`).
 
 Only one writer thread exists because disk writes must be serialized and because the `ReorderBuffer` is inherently sequential.

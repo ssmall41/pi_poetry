@@ -1,6 +1,6 @@
 # Pi Poetry
 
-Pi Poetry searches for natural-language words and phrases hidden in the decimal expansion of pi. It maps digit pairs to letters and scans the resulting character stream with an Aho-Corasick automaton, then groups found words into phrases.
+Pi Poetry searches for natural-language words and phrases hidden in large sequences of digits. It maps consecutive-digit to letters and scans the resulting character stream with an Aho-Corasick automaton, then groups found words into phrases.
 
 ## Building
 
@@ -46,17 +46,11 @@ keep the machine usable while compiling:
   These cut total compile work and lower peak memory (~728 → ~620 MiB for a Debug
   clean build).
 
-**A note on clean-build wall-clock.** With the Unix Makefiles generator the clean
-build is *critical-path bound*, not throughput bound: after an initial 8-wide burst
-it tails off to 1–3 active compiles (long single TUs such as `httplib.cc`, the PCH,
-and the final single-threaded link), so it averages only ~3 of 8 cores and raising
-`--parallel` past ~4 does **not** help. The big lever for wall-clock would be the
-**Ninja generator** (`cmake -G Ninja …`), which schedules all cores and would
-roughly halve a clean build — adopt it if clean-build time becomes a priority.
-
 ## Running
 
-Supply a plain-text file of pi digits (one ASCII digit per byte) at `data/pi_digits.txt`, or adjust `config/default.toml` to point at your file. Then:
+### Reading digits from a text file
+
+Supply a plain-text file of digits (one ASCII digit per byte) and adjust `config/default.toml` to point at your file. Then:
 
 ```bash
 ./build/pi_poetry --config config/default.toml
@@ -64,9 +58,9 @@ Supply a plain-text file of pi digits (one ASCII digit per byte) at `data/pi_dig
 
 Each run creates a timestamped subfolder (e.g. `outputs/run-20260506_143022/`) containing `results.json`. If `write_letter_sequence = true` in the `[digit_mapper]` config, `letter_sequence.txt` is also written. The output directory is configurable in `config/default.toml`.
 
-### Downloading digits from an online API
+### Downloading digits of pi from an online API
 
-Instead of a local file, you can stream digits directly from an HTTP/HTTPS API. Set `digit_source.type = "api"` and point `source_config` at a per-source TOML file that describes the API. A ready-made config for [api.pi.delivery](https://api.pi.delivery) is included:
+Instead of a local file, you can stream digits of pi directly from an HTTP/HTTPS API. Set `digit_source.type = "api"` and point `source_config` at a per-source TOML file that describes the API. A ready-made config for [api.pi.delivery](https://api.pi.delivery) is included:
 
 ```toml
 [digit_source]
@@ -76,7 +70,7 @@ max_digits    = 100000   # 0 = run indefinitely
 threads       = 4
 ```
 
-Multiple feeder threads download different chunks in parallel (each request specifies a start offset). The `api.pi.delivery` API allows up to 1,000 digits per request; the pipeline issues as many requests as needed to fill each chunk.
+Multiple threads download different chunks in parallel (each request specifies a start offset). The `api.pi.delivery` API allows up to 1,000 digits per request; the pipeline issues as many requests as needed to fill each chunk.
 
 ### Graceful stop (indefinite runs)
 
@@ -93,10 +87,6 @@ The pipeline detects this file between chunks, stops fetching new data, drains t
 ```bash
 ctest --test-dir build --output-on-failure
 ```
-
-## VSCode
-
-Open the folder in VSCode. Use **Ctrl+Shift+B** to build, the Testing panel (flask icon) to run tests, and **F5** to debug.
 
 ## Configuration
 
@@ -165,7 +155,7 @@ base=10
 |-------|---------|--------------|-------------|
 | `type` * | `"aho-corasick-cpu"` | `"aho-corasick-cpu"` | Word-finder implementation to use. |
 | `dictionary` | `"dictionaries/english.txt"` | Any file path | Path to the word list, one word per line. |
-| `overlap_policy` | `"earliest-then-longest"` | `"earliest-then-longest"`, `"all-combos"` | How to resolve overlapping word matches. `"earliest-then-longest"` greedily picks one non-overlapping sequence: the match starting soonest, with ties broken by longest word. `"all-combos"` enumerates every possible consecutive chain of non-overlapping words; use this to explore all valid readings. |
+| `overlap_policy` | `"earliest-then-longest"` | `"earliest-then-longest"`, `"all-combos"` | How to resolve overlapping word matches. `"earliest-then-longest"` greedily picks one non-overlapping sequence (the match starting soonest, ties broken by longest word), then splits it into runs of directly consecutive words. `"all-combos"` enumerates every possible consecutive chain of non-overlapping words; use this to explore all valid readings. Under both policies, only runs of at least `[phrase_scanner].min_phrase_length` consecutive words are emitted. |
 | `min_word_length` | `1` | Positive integer | Words shorter than this are ignored when loading the dictionary. |
 | `threads` | `1` | Positive integer | Number of worker threads that scan letter packages for dictionary words. |
 | `queue_size` | `16` | Positive integer | Maximum number of combo packages buffered between the word finder and the phrase scanner. The word finder blocks when this limit is reached, applying back-pressure. |
@@ -336,7 +326,3 @@ cmake --build build --parallel 4 --target analyze_results
 # Analyze using 8 threads
 ./build/analyze_results outputs/run-20260508_143022 8
 ```
-
-## Technical Design
-
-See [pi_poetry_tdd_v3.md](pi_poetry_tdd_v3.md) for the full technical design document.

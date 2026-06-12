@@ -1,6 +1,8 @@
 # Pi Poetry
 ## Technical Design Document
-*Version 0.3 — Draft | Status: Draft*
+*Version 0.3 — Final | Status: Implemented*
+
+### **Note: this TDD was used to define the MVP. The current project is past this point. The information here is kept for posterity.**
 
 ---
 
