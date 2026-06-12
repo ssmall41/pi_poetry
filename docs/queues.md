@@ -164,15 +164,7 @@ std::size_t combo_q_capacity  = config["word_finder"]["queue_size"].value_or(16)
 std::size_t phrase_q_capacity = config["phrase_scanner"]["queue_size"].value_or(16);
 ```
 
-**Choosing a size.** A small queue provides tight back-pressure: a fast upstream stage is throttled almost immediately when the downstream stage falls behind, which keeps memory usage low. A large queue decouples the two stages so they can run at different speeds without blocking each other. The `opt.toml` configuration shows this in practice — the word finder is CPU-bound with many threads, so its output queue is large to prevent it from stalling while the phrase scanner catches up:
-
-```toml
-[word_finder]
-queue_size = 10000
-
-[phrase_scanner]
-queue_size = 1000
-```
+**Choosing a size.** A small queue provides tight back-pressure: a fast upstream stage is throttled almost immediately when the downstream stage falls behind, which keeps memory usage low. A large queue decouples the two stages so they can run at different speeds without blocking each other. This matters most when one stage is much more expensive than its neighbours — for example, the word finder is CPU-bound and is usually run with many threads, so giving its output queue (`combo_q`) plenty of capacity lets the finders keep producing instead of stalling whenever the phrase scanner momentarily falls behind.
 
 A queue that is too small causes excessive context switching as threads block and unblock. A queue that is too large wastes memory and may hide performance imbalances between stages. Profiling with the `pipeline.debug = true` flag (which logs each package claim along with the current in-queue and out-queue depths) is the recommended way to tune these values.
 
