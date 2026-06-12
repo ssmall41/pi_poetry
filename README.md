@@ -1,6 +1,6 @@
 # Pi Poetry
 
-Pi Poetry searches for natural-language words and phrases hidden in large sequences of digits. It maps consecutive-digit to letters and scans the resulting character stream with an Aho-Corasick automaton, then groups found words into phrases.
+Pi Poetry searches for natural-language words and phrases hidden in large sequences of digits. It maps consecutive-digit to letters and scans the resulting character stream with an [Aho-Corasick](https://en.wikipedia.org/wiki/Aho%E2%80%93Corasick_algorithm) automaton, then groups found words into phrases.
 
 ## Building
 

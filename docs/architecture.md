@@ -121,7 +121,7 @@ Example: digits `3`, `1` → value `31` → `31 % 26 = 5` → `'f'`
 
 ## Stage 3: Word Finder
 
-**Purpose:** Scan the character stream for all occurrences of dictionary words using an Aho-Corasick automaton, then resolve overlapping matches according to a configured policy. Currently, consecutive word chains are emitted, but this might change in the future.
+**Purpose:** Scan the character stream for all occurrences of dictionary words using an [Aho-Corasick](https://en.wikipedia.org/wiki/Aho%E2%80%93Corasick_algorithm) automaton, then resolve overlapping matches according to a configured policy. Currently, consecutive word chains are emitted, but this might change in the future.
 
 **Key files:**
 - [include/word_finder/WordFinder.hpp](../include/word_finder/WordFinder.hpp) — abstract interface
